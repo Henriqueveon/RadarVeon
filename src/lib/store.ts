@@ -171,31 +171,81 @@ function mapEvento(row: any): EventoManual {
 // ---------- Initial load ----------
 let initPromise: Promise<void> | null = null;
 
+async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 export async function initializeStore(): Promise<void> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const [t, c, r, cr, o, e] = await Promise.all([
-      supabase.from("tripulantes").select("*").order("created_at", { ascending: false }),
-      supabase.from("campanhas").select("*").order("data", { ascending: false }),
-      supabase.from("reunioes").select("*").order("data", { ascending: false }),
-      supabase.from("criativos").select("*").order("data", { ascending: false }),
-      supabase.from("observacoes").select("*").order("created_at", { ascending: false }),
-      supabase.from("eventos_manuais").select("*").order("data", { ascending: false }),
-    ]);
+    try {
+      const TIMEOUT = 8000;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const emptyResult = { data: [], error: null } as any;
 
-    cache.tripulantes = (t.data ?? []).map(mapTripulante);
-    cache.campanhas = (c.data ?? []).map(mapCampanha);
-    cache.reunioes = (r.data ?? []).map(mapReuniao);
-    cache.criativos = (cr.data ?? []).map(mapCriativo);
-    cache.observacoes = (o.data ?? []).map(mapObservacao);
-    cache.eventosManuais = (e.data ?? []).map(mapEvento);
+      const [t, c, r, cr, o, e] = await Promise.all([
+        withTimeout(
+          Promise.resolve(supabase.from("tripulantes").select("*").order("created_at", { ascending: false })),
+          TIMEOUT,
+          emptyResult
+        ),
+        withTimeout(
+          Promise.resolve(supabase.from("campanhas").select("*").order("data", { ascending: false })),
+          TIMEOUT,
+          emptyResult
+        ),
+        withTimeout(
+          Promise.resolve(supabase.from("reunioes").select("*").order("data", { ascending: false })),
+          TIMEOUT,
+          emptyResult
+        ),
+        withTimeout(
+          Promise.resolve(supabase.from("criativos").select("*").order("data", { ascending: false })),
+          TIMEOUT,
+          emptyResult
+        ),
+        withTimeout(
+          Promise.resolve(supabase.from("observacoes").select("*").order("created_at", { ascending: false })),
+          TIMEOUT,
+          emptyResult
+        ),
+        withTimeout(
+          Promise.resolve(supabase.from("eventos_manuais").select("*").order("data", { ascending: false })),
+          TIMEOUT,
+          emptyResult
+        ),
+      ]);
 
-    hydrateObservacoes();
+      if (t.error) console.error("[store] tripulantes:", t.error);
+      if (c.error) console.error("[store] campanhas:", c.error);
+      if (r.error) console.error("[store] reunioes:", r.error);
+      if (cr.error) console.error("[store] criativos:", cr.error);
+      if (o.error) console.error("[store] observacoes:", o.error);
+      if (e.error) console.error("[store] eventos:", e.error);
+
+      cache.tripulantes = ((t.data ?? []) as unknown[]).map(mapTripulante);
+      cache.campanhas = ((c.data ?? []) as unknown[]).map(mapCampanha);
+      cache.reunioes = ((r.data ?? []) as unknown[]).map(mapReuniao);
+      cache.criativos = ((cr.data ?? []) as unknown[]).map(mapCriativo);
+      cache.observacoes = ((o.data ?? []) as unknown[]).map(mapObservacao);
+      cache.eventosManuais = ((e.data ?? []) as unknown[]).map(mapEvento);
+
+      hydrateObservacoes();
+    } catch (err) {
+      console.error("[store] Erro inesperado em initializeStore:", err);
+    }
 
     cache.initialized = true;
     notify();
 
-    subscribeRealtime();
+    try {
+      subscribeRealtime();
+    } catch (err) {
+      console.error("[store] Erro ao assinar realtime:", err);
+    }
   })();
   return initPromise;
 }

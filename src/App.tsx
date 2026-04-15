@@ -90,7 +90,12 @@ function AppShell() {
   useEffect(() => {
     if (profile?.approved) {
       setCurrentAuthor(profile.id, profile.nome);
-      initializeStore().then(() => setStoreReady(true));
+      initializeStore()
+        .then(() => setStoreReady(true))
+        .catch((err) => {
+          console.error("[App] Falha ao inicializar store:", err);
+          setStoreReady(true);
+        });
     }
   }, [profile?.approved, profile?.id, profile?.nome]);
 
