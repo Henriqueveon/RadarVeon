@@ -18,13 +18,14 @@ import {
   addCriativo,
   getActiveTripulantes,
   getTripulanteById,
+  getTeam,
 } from "@/lib/store";
 import {
-  tenentes,
   TIPO_CRIATIVO_LABELS,
   STATUS_CRIATIVO_LABELS,
   type CriativoMock,
 } from "@/lib/mock-data";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -94,6 +95,8 @@ function formatDateBR(dateStr: string): string {
 
 export default function CriativosPage() {
   useStore();
+  const { profile } = useAuth();
+  const team = getTeam();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>("todos");
@@ -119,6 +122,13 @@ export default function CriativosPage() {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [showModal]);
+
+  // Pre-select logged-in user as responsavel when modal opens
+  useEffect(() => {
+    if (showModal && profile && !form.responsavel) {
+      setForm((f) => ({ ...f, responsavel: profile.nome }));
+    }
+  }, [showModal, profile]);
 
   // Stats
   const stats = (() => {
@@ -579,10 +589,10 @@ export default function CriativosPage() {
                   className="w-full rounded border border-white/10 bg-transparent px-3 py-1.5 text-[13px] text-white outline-none focus:border-[#529cca]"
                   required
                 >
-                  <option value="">Selecione...</option>
-                  {tenentes.map((t) => (
-                    <option key={t.id} value={t.name}>
-                      {t.name}
+                  <option value="">Selecionar responsável</option>
+                  {team.map((m) => (
+                    <option key={m.id} value={m.nome}>
+                      {m.nome} — {m.role}
                     </option>
                   ))}
                 </select>

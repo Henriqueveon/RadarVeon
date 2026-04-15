@@ -8,15 +8,16 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/hooks/useStore";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   getReunioes,
   addReuniao,
   updateReuniao,
   getActiveTripulantes,
   getTripulanteById,
+  getTeam,
 } from "@/lib/store";
 import {
-  tenentes,
   ANIMO_LABELS,
   ANIMO_EMOJIS,
   formatCurrency,
@@ -54,9 +55,9 @@ function formatDateBR(dateStr: string): string {
   return `${day}/${month}/${year}`;
 }
 
-function getTenenteNameById(id: string): string {
-  const tenente = tenentes.find((t) => t.id === id);
-  return tenente?.name ?? "Desconhecido";
+function getResponsavelNameById(id: string): string {
+  const member = getTeam().find((t) => t.id === id);
+  return member?.nome ?? "Desconhecido";
 }
 
 // ── Reuniao Card ──────────────────────────────────────────────
@@ -69,7 +70,7 @@ interface ReuniaoCardProps {
 
 function ReuniaoCard({ reuniao, isExpanded, onToggle }: ReuniaoCardProps) {
   const tripulante = getTripulanteById(reuniao.tripulanteId);
-  const tenenteName = getTenenteNameById(reuniao.tenenteId);
+  const responsavelName = getResponsavelNameById(reuniao.tenenteId);
   const statusStyle = STATUS_STYLES[reuniao.status];
   const isRealizada = reuniao.status === "realizada";
 
@@ -117,7 +118,7 @@ function ReuniaoCard({ reuniao, isExpanded, onToggle }: ReuniaoCardProps) {
           </span>
 
           <span className="text-[13px] text-[#6f6f6f]">
-            Tenente: {tenenteName}
+            Responsável: {responsavelName}
           </span>
         </div>
 
@@ -248,6 +249,8 @@ function ReuniaoCard({ reuniao, isExpanded, onToggle }: ReuniaoCardProps) {
 
 export default function ReunioesPage() {
   useStore();
+  const { profile } = useAuth();
+  const team = getTeam();
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>("todas");
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -278,6 +281,13 @@ export default function ReunioesPage() {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isModalOpen]);
+
+  // Pre-select current user as responsável when opening modal
+  useEffect(() => {
+    if (isModalOpen && profile && !formData.tenenteId) {
+      setFormData((prev) => ({ ...prev, tenenteId: profile.id }));
+    }
+  }, [isModalOpen, profile, formData.tenenteId]);
 
   const allReunioes = getReunioes();
 
@@ -564,7 +574,7 @@ export default function ReunioesPage() {
                   htmlFor="reuniao-tenente"
                   className="mb-1 block text-xs text-[#9b9b9b]"
                 >
-                  Tenente
+                  Responsável
                 </label>
                 <select
                   id="reuniao-tenente"
@@ -573,11 +583,11 @@ export default function ReunioesPage() {
                   onChange={(e) => updateField("tenenteId", e.target.value)}
                 >
                   <option value="" disabled>
-                    Selecionar tenente
+                    Selecionar responsável
                   </option>
-                  {tenentes.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
+                  {team.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.nome} — {m.role}
                     </option>
                   ))}
                 </select>

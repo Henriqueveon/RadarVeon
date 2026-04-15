@@ -12,14 +12,15 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { useStore } from "@/hooks/useStore";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   getActiveTripulantes,
   getCampanhas,
   addCampanha,
   getTripulanteById,
+  getTeam,
 } from "@/lib/store";
 import {
-  tenentes,
   formatCurrency,
   formatVariation,
   TIPO_CAMPANHA_LABELS,
@@ -109,12 +110,20 @@ function computeWeekMetrics(
 
 export default function CampanhasPage() {
   useStore();
+  const { profile } = useAuth();
+  const team = getTeam();
 
   const [selectedTripulanteId, setSelectedTripulanteId] = useState<
     string | null
   >(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(INITIAL_FORM);
+
+  useEffect(() => {
+    if (showModal && profile && !form.responsavel) {
+      setForm((f) => ({ ...f, responsavel: profile.nome }));
+    }
+  }, [showModal, profile, form.responsavel]);
 
   const selectedTripulante = selectedTripulanteId
     ? getTripulanteById(selectedTripulanteId)
@@ -184,6 +193,7 @@ export default function CampanhasPage() {
           setForm={setForm}
           onClose={handleCloseModal}
           onSubmit={handleSubmit}
+          team={team}
         />
       )}
     </div>
@@ -566,11 +576,13 @@ function NovoRegistroModal({
   setForm,
   onClose,
   onSubmit,
+  team,
 }: {
   form: typeof INITIAL_FORM;
   setForm: React.Dispatch<React.SetStateAction<typeof INITIAL_FORM>>;
   onClose: () => void;
   onSubmit: (e: React.FormEvent) => void;
+  team: { id: string; nome: string; role: string }[];
 }) {
   const activeTripulantes = getActiveTripulantes();
 
@@ -716,11 +728,11 @@ function NovoRegistroModal({
               }
             >
               <option value="" disabled>
-                Selecione...
+                Selecionar responsável
               </option>
-              {tenentes.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name}
+              {team.map((m) => (
+                <option key={m.id} value={m.nome}>
+                  {m.nome} — {m.role}
                 </option>
               ))}
             </select>

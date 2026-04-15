@@ -30,10 +30,12 @@ import {
   getTimelineForTripulante,
   getTripulanteHealth,
   addEventoManual,
+  getTeam,
   type TimelineEvent,
   type EventoManual,
 } from "@/lib/store";
-import { tenentes, formatCurrency, ANIMO_EMOJIS } from "@/lib/mock-data";
+import { formatCurrency, ANIMO_EMOJIS } from "@/lib/mock-data";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -470,11 +472,13 @@ interface ModalProps {
 }
 
 function RegistrarEventoModal({ tripulanteId, open, onClose }: ModalProps) {
+  const { profile } = useAuth();
+  const team = getTeam();
   const [tipo, setTipo] = useState<EventoManual["tipo"]>("observacao");
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [data, setData] = useState(new Date().toISOString().split("T")[0]);
-  const [responsavel, setResponsavel] = useState(tenentes[0]?.name ?? "");
+  const [responsavel, setResponsavel] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
 
@@ -486,6 +490,12 @@ function RegistrarEventoModal({ tripulanteId, open, onClose }: ModalProps) {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (open && profile && !responsavel) {
+      setResponsavel(profile.nome);
+    }
+  }, [open, profile]);
 
   // Trap focus — simplified: focus first input on open
   const firstInputRef = useRef<HTMLSelectElement>(null);
@@ -628,9 +638,10 @@ function RegistrarEventoModal({ tripulanteId, open, onClose }: ModalProps) {
               onChange={(e) => setResponsavel(e.target.value)}
               className="bg-transparent border border-white/10 rounded px-3 py-1.5 text-[13px] text-white focus:outline-none focus:border-[#529cca]"
             >
-              {tenentes.map((t) => (
-                <option key={t.id} value={t.name}>
-                  {t.name}
+              <option value="">Selecionar responsável</option>
+              {team.map((m) => (
+                <option key={m.id} value={m.nome}>
+                  {m.nome} — {m.role}
                 </option>
               ))}
             </select>

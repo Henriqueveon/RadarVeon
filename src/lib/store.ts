@@ -9,6 +9,7 @@
 
 import { supabase } from "./supabase";
 import { createNotification } from "./notifications";
+import type { Profile } from "./auth-types";
 import type {
   TripulanteMock,
   CampanhaRegistro,
@@ -16,6 +17,12 @@ import type {
   CriativoMock,
   Observacao,
 } from "./mock-data";
+
+export interface TeamMember {
+  id: string;
+  nome: string;
+  role: string;
+}
 
 export interface EventoManual {
   id: string;
@@ -37,6 +44,7 @@ interface Cache {
   criativos: CriativoMock[];
   observacoes: (Observacao & { tripulanteId: string })[];
   eventosManuais: EventoManual[];
+  team: TeamMember[];
   initialized: boolean;
 }
 
@@ -47,6 +55,7 @@ const cache: Cache = {
   criativos: [],
   observacoes: [],
   eventosManuais: [],
+  team: [],
   initialized: false,
 };
 
@@ -76,6 +85,11 @@ export function setCurrentAuthor(id: string | null, name: string = "") {
 
 export function getCurrentAuthor() {
   return { id: currentAuthorId, name: currentAuthorName };
+}
+
+// Retorna membros aprovados da equipe pra preencher dropdowns de "Responsável"
+export function getTeam(): TeamMember[] {
+  return cache.team;
 }
 
 // ---------- Row mappers ----------
@@ -219,6 +233,25 @@ export async function initializeStore(): Promise<void> {
         ),
       ]);
 
+      // Carrega membros aprovados da equipe (pra dropdown de responsável)
+      const teamRes = await withTimeout(
+        Promise.resolve(
+          supabase
+            .from("profiles")
+            .select("id, nome, role")
+            .eq("approved", true)
+            .order("nome")
+        ),
+        TIMEOUT,
+        emptyResult
+      );
+      if (teamRes.error) console.error("[store] team:", teamRes.error);
+      cache.team = ((teamRes.data ?? []) as Profile[]).map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        role: p.role,
+      }));
+
       if (t.error) console.error("[store] tripulantes:", t.error);
       if (c.error) console.error("[store] campanhas:", c.error);
       if (r.error) console.error("[store] reunioes:", r.error);
@@ -294,6 +327,19 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "eventos_manuais" }, async () => {
       const { data } = await supabase.from("eventos_manuais").select("*").order("data", { ascending: false });
       cache.eventosManuais = (data ?? []).map(mapEvento);
+      notify();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, nome, role")
+        .eq("approved", true)
+        .order("nome");
+      cache.team = ((data ?? []) as Profile[]).map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        role: p.role,
+      }));
       notify();
     })
     .subscribe();
