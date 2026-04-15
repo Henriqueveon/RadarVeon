@@ -194,29 +194,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message };
     if (!data.user) return { error: "Falha ao criar usuário." };
 
-    // Fallback: se por algum motivo o trigger não rodou, tenta inserir direto
-    // (Seguro: a policy RLS força approved=false e rejeita role='almirante')
-    const { data: existingProfile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", data.user.id)
-      .maybeSingle();
-
-    if (!existingProfile) {
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        nome,
-        email,
-        role,
-        observacao_funcao: observacaoFuncao,
-        avatar_iniciais: getInitials(nome),
-        approved: false,
+    // Fallback robusto via RPC ensure_profile (SECURITY DEFINER, idempotente)
+    try {
+      const { error: rpcError } = await supabase.rpc("ensure_profile", {
+        p_nome: nome,
+        p_role: role,
+        p_obs: observacaoFuncao,
+        p_avatar: getInitials(nome),
       });
-      if (profileError) {
-        console.error("[Auth] signUp profile insert fallback:", profileError);
-        // Não falha o signup — user está criado no auth, o Almirante pode
-        // criar o profile manualmente ou o trigger vai rodar em confirmação
+      if (rpcError) {
+        console.warn("[Auth] ensure_profile RPC falhou, tentando insert direto:", rpcError);
+        const { data: existingProfile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", data.user.id)
+          .maybeSingle();
+        if (!existingProfile) {
+          await supabase.from("profiles").insert({
+            id: data.user.id,
+            nome,
+            email,
+            role,
+            observacao_funcao: observacaoFuncao,
+            avatar_iniciais: getInitials(nome),
+            approved: false,
+          });
+        }
       }
+    } catch (err) {
+      console.error("[Auth] Falha em fallback de profile:", err);
     }
 
     return { error: null };
