@@ -25,6 +25,21 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
+  return Promise.race([
+    p.catch((err) => {
+      console.error(`[Auth] ${label} ERRO:`, err);
+      return fallback;
+    }),
+    new Promise<T>((resolve) =>
+      setTimeout(() => {
+        console.warn(`[Auth] ${label} TIMEOUT após ${ms}ms — usando fallback`);
+        resolve(fallback);
+      }, ms)
+    ),
+  ]);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -32,16 +47,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function fetchProfile(userId: string): Promise<Profile | null> {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
-    if (error) {
-      console.error("fetchProfile:", error);
+    console.log("[Auth] Buscando profile de", userId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const query = supabase.from("profiles").select("*").eq("id", userId).maybeSingle() as any;
+    const result = await withTimeout<{ data: Profile | null; error: unknown }>(
+      Promise.resolve(query),
+      6000,
+      { data: null, error: null },
+      "fetchProfile"
+    );
+    if (result.error) {
+      console.error("[Auth] fetchProfile error:", result.error);
       return null;
     }
-    return data as Profile | null;
+    console.log("[Auth] Profile carregado:", result.data ? "OK" : "NULL");
+    return result.data;
   }
 
   async function refreshProfile() {
@@ -52,30 +72,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    console.log("[Auth] Inicializando...");
 
-    supabase.auth
-      .getSession()
+    withTimeout(
+      supabase.auth.getSession(),
+      6000,
+      { data: { session: null }, error: null },
+      "getSession"
+    )
       .then(async ({ data: { session: s } }) => {
         if (!mounted) return;
+        console.log("[Auth] getSession resolveu. Session:", s ? "ativa" : "null");
         setSession(s);
         setUser(s?.user ?? null);
+        setLoading(false);
+
         if (s?.user) {
           const p = await fetchProfile(s.user.id);
           if (mounted) setProfile(p);
         }
-        if (mounted) setLoading(false);
       })
       .catch((err) => {
-        console.error("getSession error:", err);
+        console.error("[Auth] getSession erro fatal:", err);
         if (mounted) setLoading(false);
       });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    } = supabase.auth.onAuthStateChange(async (event, s) => {
       if (!mounted) return;
+      console.log("[Auth] onAuthStateChange:", event);
       setSession(s);
       setUser(s?.user ?? null);
+      setLoading(false);
+
       if (s?.user) {
         const p = await fetchProfile(s.user.id);
         if (mounted) setProfile(p);
@@ -90,7 +120,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Realtime: escuta mudanças no próprio perfil (ex: approval pelo Almirante)
   useEffect(() => {
     if (!user) return;
     const channel = supabase

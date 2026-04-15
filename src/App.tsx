@@ -185,25 +185,70 @@ function AppShell() {
 }
 
 function Gate() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, signOut, refreshProfile } = useAuth();
+  const [profileWaitTimeout, setProfileWaitTimeout] = useState(false);
+
+  useEffect(() => {
+    if (session && !profile && !loading) {
+      const t = setTimeout(() => setProfileWaitTimeout(true), 6000);
+      return () => clearTimeout(t);
+    }
+  }, [session, profile, loading]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#191919] flex items-center justify-center">
-        <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
+        <div className="text-center space-y-3">
+          <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
+          <p className="text-[12px] text-[#6f6f6f]">Verificando sessão...</p>
+        </div>
       </div>
     );
   }
 
   if (!session) return <AuthPage />;
-  if (profile && !profile.approved) return <PendingApprovalPage />;
-  if (!profile) {
+
+  if (session && !profile && !profileWaitTimeout) {
     return (
-      <div className="min-h-screen bg-[#191919] flex items-center justify-center p-6">
-        <p className="text-[13px] text-[#9b9b9b]">Perfil não encontrado. Tente sair e entrar novamente.</p>
+      <div className="min-h-screen bg-[#191919] flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
+          <p className="text-[12px] text-[#6f6f6f]">Carregando perfil...</p>
+        </div>
       </div>
     );
   }
+
+  if (session && !profile && profileWaitTimeout) {
+    return (
+      <div className="min-h-screen bg-[#191919] flex items-center justify-center p-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-[14px] text-white">Não foi possível carregar seu perfil.</p>
+          <p className="text-[12px] text-[#9b9b9b]">
+            Pode ser um problema de conexão ou seu perfil não existe no banco.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <button
+              type="button"
+              onClick={async () => { setProfileWaitTimeout(false); await refreshProfile(); }}
+              className="rounded border border-white/10 hover:bg-white/5 text-white text-[13px] px-3 py-1.5"
+            >
+              Tentar novamente
+            </button>
+            <button
+              type="button"
+              onClick={signOut}
+              className="rounded border border-white/10 hover:bg-white/5 text-[#9b9b9b] text-[13px] px-3 py-1.5"
+            >
+              Sair e entrar de novo
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (profile && !profile.approved) return <PendingApprovalPage />;
   return <AppShell />;
 }
 
