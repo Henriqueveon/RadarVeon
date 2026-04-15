@@ -8,6 +8,7 @@ import AuthPage, { PendingApprovalPage } from "@/pages/AuthPage";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { initializeStore, setCurrentAuthor } from "@/lib/store";
 import { ROLE_LABELS_SHORT } from "@/lib/auth-types";
+import { getRandomQuote } from "@/lib/mission-quotes";
 
 import DashboardPage from "@/pages/DashboardPage";
 import TripulantesPage from "@/pages/TripulantesPage";
@@ -84,6 +85,7 @@ function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
   const [jornadaTripulanteId, setJornadaTripulanteId] = useState<string | null>(null);
   const [storeReady, setStoreReady] = useState(false);
+  const [quote] = useState(() => getRandomQuote());
 
   useEffect(() => {
     if (profile?.approved) {
@@ -113,12 +115,19 @@ function AppShell() {
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#191919]">
         <div className="mx-auto max-w-[1280px] px-6">
-          <div className="grid grid-cols-3 h-24 items-center">
+          <div className="grid grid-cols-3 min-h-[120px] py-3 items-center">
             <div className="flex items-center justify-start">
               <NotificationsBell />
             </div>
-            <div className="flex justify-center">
+            <div className="flex flex-col items-center gap-2">
               <img src="/icone-logo.png" alt="Instituto Veon" className="h-20 w-auto" />
+              <p className="max-w-[420px] text-center text-[11px] leading-snug text-[#9b9b9b] italic">
+                <span className="mr-1.5 not-italic font-semibold text-[#529cca]">
+                  {quote.categoria}
+                  {quote.numero ? ` ${quote.numero}` : ""}
+                </span>
+                <span>"{quote.texto}"</span>
+              </p>
             </div>
             <div className="flex items-center justify-end gap-3">
               <UserMenu />
