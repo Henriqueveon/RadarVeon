@@ -438,12 +438,13 @@ export default function DashboardPage({ onNavigateJornada }: DashboardPageProps)
                         fontSize: "13px",
                       }}
                       labelStyle={{ color: "#9b9b9b" }}
-                      formatter={(value: number, name: string) => {
+                      formatter={(value, name) => {
+                        const num = typeof value === "number" ? value : Number(value ?? 0);
                         const formatted =
                           name === "Atual" || name === "Anterior"
-                            ? value.toLocaleString("pt-BR")
-                            : value;
-                        return [formatted, name];
+                            ? num.toLocaleString("pt-BR")
+                            : num;
+                        return [formatted, name as string];
                       }}
                     />
                     <Legend
