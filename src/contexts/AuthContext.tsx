@@ -177,8 +177,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp({ nome, email, password, role, observacaoFuncao }: SignUpPayload) {
-    // Passa dados via user_metadata — o trigger handle_new_user cria o profile
-    // automaticamente via SECURITY DEFINER (bypassa RLS, previne erro de auth.uid null)
+    // v7: sem trigger no Supabase. Signup em auth.users é isolado e rápido.
+    // O profile é criado logo após via RPC ensure_profile.
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -194,7 +194,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message };
     if (!data.user) return { error: "Falha ao criar usuário." };
 
-    // Fallback robusto via RPC ensure_profile (SECURITY DEFINER, idempotente)
+    // Aguarda a session estabilizar antes de chamar RPC (precisa de auth.uid)
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Fallback robusto: tenta criar profile via RPC (função ensure_profile).
+    // Essa função roda como SECURITY DEFINER e é idempotente.
+    // Se o trigger já criou, não faz nada. Se não criou, cria agora.
+    // Usamos RPC em vez de insert direto pra evitar issues de RLS/session.
     try {
       const { error: rpcError } = await supabase.rpc("ensure_profile", {
         p_nome: nome,
@@ -204,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (rpcError) {
         console.warn("[Auth] ensure_profile RPC falhou, tentando insert direto:", rpcError);
+        // Segundo fallback: insert direto (caso RPC não exista ainda no Supabase)
         const { data: existingProfile } = await supabase
           .from("profiles")
           .select("id")
@@ -223,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error("[Auth] Falha em fallback de profile:", err);
+      // Ainda retorna sucesso — user existe em auth.users, Almirante pode criar profile manualmente
     }
 
     return { error: null };
