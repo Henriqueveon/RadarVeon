@@ -125,7 +125,7 @@ function AppShell() {
               <NotificationsBell />
             </div>
             <div className="flex flex-col items-center gap-2">
-              <img src="/icone-logo.png" alt="Instituto Veon" className="h-20 w-auto" />
+              <img src="/icone-logo.svg" alt="Instituto Veon" className="h-20 w-auto" />
               <p className="max-w-[420px] text-center text-[11px] leading-snug text-[#9b9b9b] italic">
                 <span className="mr-1.5 not-italic font-semibold text-[#529cca]">
                   {quote.categoria}

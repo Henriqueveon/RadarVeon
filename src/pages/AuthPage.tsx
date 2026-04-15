@@ -96,7 +96,7 @@ export default function AuthPage() {
     <div className="min-h-screen bg-[#191919] flex items-center justify-center p-6">
       <div className="w-full max-w-md space-y-6">
         <div className="flex flex-col items-center gap-3">
-          <img src="/icone-logo.png" alt="Instituto Veon" className="h-16 w-auto" />
+          <img src="/icone-logo.svg" alt="Instituto Veon" className="h-16 w-auto" />
           <p className="text-[11px] uppercase tracking-widest text-[#6f6f6f]">
             RADAR VEON · Instituto Veon
           </p>
