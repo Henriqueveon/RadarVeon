@@ -1,0 +1,237 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* Notion-inspired neutral dark palette */
+  --color-background: #191919;
+  --color-surface: #1f1f1f;
+  --color-surface-hover: #252525;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.14);
+
+  --color-text: #e6e6e6;
+  --color-text-muted: #9b9b9b;
+  --color-text-subtle: #6f6f6f;
+
+  --color-accent: #529cca;
+  --color-accent-hover: #6bb1de;
+  --color-accent-soft: rgba(82, 156, 202, 0.12);
+
+  /* Semantic colors — used as TEXT, rarely as background */
+  --color-success: #4aa971;
+  --color-warning: #d79b3f;
+  --color-danger: #e07464;
+  --color-info: #529cca;
+
+  /* Legacy aliases for shadcn components */
+  --color-foreground: #e6e6e6;
+  --color-card: #1f1f1f;
+  --color-card-foreground: #e6e6e6;
+  --color-popover: #1f1f1f;
+  --color-popover-foreground: #e6e6e6;
+  --color-primary: #529cca;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #252525;
+  --color-secondary-foreground: #e6e6e6;
+  --color-muted: #252525;
+  --color-muted-foreground: #9b9b9b;
+  --color-accent-foreground: #e6e6e6;
+  --color-destructive: #e07464;
+  --color-destructive-foreground: #ffffff;
+  --color-input: rgba(255, 255, 255, 0.08);
+  --color-ring: #529cca;
+
+  --radius-lg: 6px;
+  --radius-md: 6px;
+  --radius-sm: 4px;
+
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html, body {
+    margin: 0;
+    background: #191919;
+    color: #e6e6e6;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(82, 156, 202, 0.35);
+    color: #ffffff;
+  }
+}
+
+/* ============================================
+   Notion-style components (utility classes)
+   ============================================ */
+
+/* Subtle surface — used sparingly, only when content needs grouping */
+.surface {
+  background: #1f1f1f;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+}
+
+/* Primary card — replaces old .card-glass */
+.card-glass {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.card-glass:hover {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+/* Row item (list rows like Notion) */
+.row-item {
+  border-radius: 4px;
+  padding: 8px 10px;
+  transition: background-color 100ms ease;
+}
+
+.row-item:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: #529cca;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: #6bb1de;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: #e6e6e6;
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #9b9b9b;
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6e6e6;
+}
+
+/* Form inputs — clean and flat */
+.input-notion,
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="tel"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="number"],
+textarea,
+select {
+  background: #252525;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: #e6e6e6;
+  border-radius: 4px;
+  font-size: 13px;
+  padding: 6px 10px;
+  transition: border-color 100ms ease, background-color 100ms ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: #529cca;
+  background: #2a2a2a;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #6f6f6f;
+}
+
+/* Text colors (Notion-style minimal semantic) */
+.text-success { color: #4aa971; }
+.text-warning { color: #d79b3f; }
+.text-danger  { color: #e07464; }
+.text-info    { color: #529cca; }
+
+/* Labels */
+label {
+  font-size: 12px;
+  color: #9b9b9b;
+  font-weight: 500;
+}
+
+/* Headings */
+h1 { font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.01em; }
+h2 { font-size: 16px; font-weight: 600; color: #ffffff; }
+h3 { font-size: 14px; font-weight: 600; color: #ffffff; }
+
+/* Dividers */
+.divider {
+  border: none;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Animation */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fade-in 180ms ease-out;
+}
+
+/* Scrollbar — thin and quiet */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  border: 2px solid #191919;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
