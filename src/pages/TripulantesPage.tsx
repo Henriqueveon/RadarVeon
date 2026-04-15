@@ -26,6 +26,7 @@ import {
   addTripulante,
   addObservacao,
   deleteTripulante,
+  updateTripulante,
   computeKPIs,
 } from "@/lib/store";
 import { tenentes, formatCurrency } from "@/lib/mock-data";
@@ -133,9 +134,11 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [newObsText, setNewObsText] = useState("");
   const [newForm, setNewForm] = useState<NewTripulanteForm>(EMPTY_FORM);
+  const [editForm, setEditForm] = useState<NewTripulanteForm>(EMPTY_FORM);
 
   // Import state
   const [importMode, setImportMode] = useState<"csv" | "paste">("csv");
@@ -146,6 +149,7 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
 
   const detailModalRef = useRef<HTMLDivElement>(null);
   const createModalRef = useRef<HTMLDivElement>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
 
   const allTripulantes = getTripulantes();
 
@@ -229,6 +233,28 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
 
     toast.success(`Tripulante "${name}" criado com sucesso!`);
     closeCreate();
+  }
+
+  function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedTripulante) return;
+    const { name, loja, cidade, uf, phone, email, tenente, plano } = editForm;
+    if (!name || !loja || !cidade || !uf || !phone || !email || !tenente || !plano) {
+      toast.error("Preencha todos os campos obrigatórios.");
+      return;
+    }
+    updateTripulante(selectedTripulante.id, {
+      name,
+      loja,
+      cidade,
+      uf,
+      phone,
+      email,
+      tenente,
+      plano,
+    });
+    toast.success("Tripulante atualizado!");
+    setEditOpen(false);
   }
 
   function handleDelete() {
@@ -318,13 +344,14 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         if (importOpen) closeImport();
+        if (editOpen) setEditOpen(false);
         if (detailOpen) closeDetail();
         if (createOpen) closeCreate();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [detailOpen, createOpen, importOpen]);
+  }, [detailOpen, createOpen, importOpen, editOpen]);
 
   function handleDetailBackdropClick(e: React.MouseEvent) {
     if (detailModalRef.current && !detailModalRef.current.contains(e.target as Node)) {
@@ -335,6 +362,12 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
   function handleCreateBackdropClick(e: React.MouseEvent) {
     if (createModalRef.current && !createModalRef.current.contains(e.target as Node)) {
       closeCreate();
+    }
+  }
+
+  function handleEditBackdropClick(e: React.MouseEvent) {
+    if (editModalRef.current && !editModalRef.current.contains(e.target as Node)) {
+      setEditOpen(false);
     }
   }
 
@@ -607,6 +640,26 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
 
             {/* Action buttons */}
             <div className="border-t border-white/[0.06] pt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selectedTripulante) return;
+                  setEditForm({
+                    name: selectedTripulante.name,
+                    loja: selectedTripulante.loja,
+                    cidade: selectedTripulante.cidade,
+                    uf: selectedTripulante.uf,
+                    phone: selectedTripulante.phone,
+                    email: selectedTripulante.email,
+                    tenente: selectedTripulante.tenente,
+                    plano: selectedTripulante.plano,
+                  });
+                  setEditOpen(true);
+                }}
+                className="w-full rounded-lg border border-white/10 hover:bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Editar Tripulante
+              </button>
               {onNavigateJornada && (
                 <button
                   type="button"
@@ -762,6 +815,146 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
                 className="w-full rounded bg-[#529cca] hover:bg-[#6bb1de] text-white py-1.5 text-[13px] font-medium transition-colors focus:outline-none focus:ring-1 focus:ring-[#529cca]"
               >
                 Criar Tripulante
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit modal */}
+      {editOpen && selectedTripulante && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Editar Tripulante"
+          onClick={handleEditBackdropClick}
+        >
+          <div
+            ref={editModalRef}
+            className="bg-[#1f1f1f] border border-white/[0.08] rounded-xl w-full max-w-2xl p-6 max-h-[85vh] overflow-y-auto"
+          >
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-[16px] font-semibold text-white">Editar Tripulante</h2>
+              <button
+                type="button"
+                onClick={() => setEditOpen(false)}
+                aria-label="Fechar modal"
+                className="text-[#9b9b9b] hover:text-white hover:bg-white/5 px-2 py-1 rounded transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <FormField
+                id="edit-name"
+                label="Nome completo"
+                value={editForm.name}
+                onChange={(v) => setEditForm((f) => ({ ...f, name: v }))}
+                placeholder="Ex: Carlos Eduardo Mendes"
+              />
+              <FormField
+                id="edit-loja"
+                label="Loja"
+                value={editForm.loja}
+                onChange={(v) => setEditForm((f) => ({ ...f, loja: v }))}
+                placeholder="Ex: Colchões Premium Campinas"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  id="edit-cidade"
+                  label="Cidade"
+                  value={editForm.cidade}
+                  onChange={(v) => setEditForm((f) => ({ ...f, cidade: v }))}
+                  placeholder="Ex: Campinas"
+                />
+                <div>
+                  <label
+                    htmlFor="edit-uf"
+                    className="mb-1 block text-xs font-medium text-[#9b9b9b]"
+                  >
+                    UF
+                  </label>
+                  <select
+                    id="edit-uf"
+                    value={editForm.uf}
+                    onChange={(e) => setEditForm((f) => ({ ...f, uf: e.target.value }))}
+                    className="w-full"
+                  >
+                    <option value="">Selecione</option>
+                    {UFS.map((uf) => (
+                      <option key={uf} value={uf}>
+                        {uf}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <FormField
+                id="edit-phone"
+                label="Telefone"
+                value={editForm.phone}
+                onChange={(v) => setEditForm((f) => ({ ...f, phone: v }))}
+                placeholder="(00) 00000-0000"
+                type="tel"
+              />
+              <FormField
+                id="edit-email"
+                label="E-mail"
+                value={editForm.email}
+                onChange={(v) => setEditForm((f) => ({ ...f, email: v }))}
+                placeholder="email@exemplo.com.br"
+                type="email"
+              />
+              <div>
+                <label
+                  htmlFor="edit-tenente"
+                  className="mb-1 block text-xs font-medium text-[#9b9b9b]"
+                >
+                  Tenente responsável
+                </label>
+                <select
+                  id="edit-tenente"
+                  value={editForm.tenente}
+                  onChange={(e) => setEditForm((f) => ({ ...f, tenente: e.target.value }))}
+                  className="w-full"
+                >
+                  <option value="">Selecione</option>
+                  {tenentes.map((ten) => (
+                    <option key={ten.id} value={ten.name}>
+                      {ten.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="edit-plano"
+                  className="mb-1 block text-xs font-medium text-[#9b9b9b]"
+                >
+                  Plano
+                </label>
+                <select
+                  id="edit-plano"
+                  value={editForm.plano}
+                  onChange={(e) => setEditForm((f) => ({ ...f, plano: e.target.value }))}
+                  className="w-full"
+                >
+                  <option value="">Selecione</option>
+                  {PLANOS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full rounded bg-[#529cca] hover:bg-[#6bb1de] text-white py-1.5 text-[13px] font-medium transition-colors focus:outline-none focus:ring-1 focus:ring-[#529cca]"
+              >
+                Salvar Alterações
               </button>
             </form>
           </div>

@@ -407,9 +407,25 @@ export async function addTripulante(t: Omit<TripulanteMock, "id" | "observacoes"
   return newT;
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  name: "Nome",
+  loja: "Loja",
+  cidade: "Cidade",
+  uf: "UF",
+  phone: "Telefone",
+  email: "E-mail",
+  tenente: "Tenente responsável",
+  plano: "Plano",
+  status: "Status",
+  avatar: "Avatar",
+};
+
 export async function updateTripulante(id: string, updates: Partial<TripulanteMock>) {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const dbUpdates: any = {};
+  const changes: string[] = [];
+  const prev = cache.tripulantes.find((t) => t.id === id);
+
   if ("name" in updates) dbUpdates.name = updates.name;
   if ("loja" in updates) dbUpdates.loja = updates.loja;
   if ("cidade" in updates) dbUpdates.cidade = updates.cidade;
@@ -420,6 +436,17 @@ export async function updateTripulante(id: string, updates: Partial<TripulanteMo
   if ("plano" in updates) dbUpdates.plano = updates.plano;
   if ("status" in updates) dbUpdates.status = updates.status;
   if ("avatar" in updates) dbUpdates.avatar = updates.avatar;
+
+  if (prev) {
+    for (const key of Object.keys(dbUpdates)) {
+      const oldV = (prev as any)[key === "name" ? "name" : key];
+      const newV = (updates as any)[key];
+      if (oldV !== newV && newV !== undefined) {
+        const label = FIELD_LABELS[key] ?? key;
+        changes.push(`${label}: "${oldV || "(vazio)"}" → "${newV || "(vazio)"}"`);
+      }
+    }
+  }
   /* eslint-enable */
 
   const { error } = await supabase.from("tripulantes").update(dbUpdates).eq("id", id);
@@ -430,6 +457,34 @@ export async function updateTripulante(id: string, updates: Partial<TripulanteMo
     cache.tripulantes[idx] = { ...cache.tripulantes[idx], ...updates };
     notify();
   }
+
+  if (changes.length > 0 && currentAuthorId) {
+    await addEventoManual({
+      tripulanteId: id,
+      tipo: "observacao",
+      titulo: "Cadastro atualizado",
+      descricao: changes.join(" · "),
+      data: new Date().toISOString().split("T")[0],
+      responsavel: currentAuthorName,
+    });
+  }
+}
+
+export async function deleteEventoManual(id: string) {
+  const { error } = await supabase.from("eventos_manuais").delete().eq("id", id);
+  if (error) throw error;
+  cache.eventosManuais = cache.eventosManuais.filter((e) => e.id !== id);
+  notify();
+}
+
+export async function deleteObservacao(id: string) {
+  const { error } = await supabase.from("observacoes").delete().eq("id", id);
+  if (error) throw error;
+  cache.observacoes = cache.observacoes.filter((o) => o.id !== id);
+  for (const t of cache.tripulantes) {
+    t.observacoes = t.observacoes.filter((o) => o.id !== id);
+  }
+  notify();
 }
 
 export async function deleteTripulante(id: string) {

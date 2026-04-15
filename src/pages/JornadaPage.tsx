@@ -19,6 +19,7 @@ import {
   TrendingDown,
   Minus,
   Filter,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,8 @@ import {
   getTimelineForTripulante,
   getTripulanteHealth,
   addEventoManual,
+  deleteEventoManual,
+  deleteObservacao,
   getTeam,
   type TimelineEvent,
   type EventoManual,
@@ -401,8 +404,28 @@ function TimelineEventCard({ event, isLast }: { event: TimelineEvent; isLast: bo
   const tipoCriativo = event.metadata?.tipoCriativo as string | undefined;
   const statusCriativo = event.metadata?.status as string | undefined;
 
+  const isManual = event.id.startsWith("manual-");
+  const isObservacao = event.id.startsWith("obs-");
+  const canRemove = isManual || isObservacao;
+
+  const handleRemove = async () => {
+    if (!window.confirm("Remover este evento da jornada?")) return;
+    try {
+      if (isManual) {
+        await deleteEventoManual(event.id.replace("manual-", ""));
+      } else if (isObservacao) {
+        await deleteObservacao(event.id.replace("obs-", ""));
+      } else {
+        return;
+      }
+      toast.success("Evento removido da jornada");
+    } catch (err) {
+      toast.error("Erro ao remover evento");
+    }
+  };
+
   return (
-    <div className="relative flex gap-4 pb-6 last:pb-0">
+    <div className="relative flex gap-4 pb-6 last:pb-0 group">
       {/* Dot + line */}
       <div className="flex flex-col items-center flex-shrink-0 w-2" aria-hidden="true">
         <span className={cn("w-2 h-2 rounded-full mt-2 flex-shrink-0", cfg.dotBg)} />
@@ -426,6 +449,16 @@ function TimelineEventCard({ event, isLast }: { event: TimelineEvent; isLast: bo
           >
             ● {event.fonte === "automatico" ? "Automático" : "Manual"}
           </span>
+          {canRemove && (
+            <button
+              type="button"
+              onClick={handleRemove}
+              aria-label="Remover evento"
+              className="shrink-0 rounded p-1 text-[#6f6f6f] hover:bg-red-500/10 hover:text-[#e07464] transition-colors opacity-0 group-hover:opacity-100"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Title */}
