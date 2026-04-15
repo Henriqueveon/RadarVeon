@@ -16,6 +16,7 @@ import CampanhasPage from "@/pages/CampanhasPage";
 import ReunioesPage from "@/pages/ReunioesPage";
 import CriativosPage from "@/pages/CriativosPage";
 import JornadaPage from "@/pages/JornadaPage";
+import ProfissionaisPage from "@/pages/ProfissionaisPage";
 
 const TABS = [
   { id: "dashboard", label: "Visão Geral" },
@@ -24,6 +25,7 @@ const TABS = [
   { id: "reunioes", label: "Reuniões" },
   { id: "criativos", label: "Criativos" },
   { id: "jornada", label: "Jornada" },
+  { id: "profissionais", label: "Profissionais" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -182,6 +184,7 @@ function AppShell() {
               onClearPreSelection={() => setJornadaTripulanteId(null)}
             />
           )}
+          {activeTab === "profissionais" && <ProfissionaisPage />}
         </div>
       </main>
     </div>

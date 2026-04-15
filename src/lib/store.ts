@@ -92,6 +92,166 @@ export function getTeam(): TeamMember[] {
   return cache.team;
 }
 
+export interface ProfissionalCompleto {
+  id: string;
+  nome: string;
+  email: string;
+  role: string;
+  observacao_funcao: string | null;
+  avatar_iniciais: string | null;
+  approved: boolean;
+  created_at: string;
+}
+
+export async function fetchProfissionais(): Promise<ProfissionalCompleto[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, nome, email, role, observacao_funcao, avatar_iniciais, approved, created_at")
+    .order("nome");
+  if (error) {
+    console.error("[store] fetchProfissionais:", error);
+    return [];
+  }
+  return (data ?? []) as ProfissionalCompleto[];
+}
+
+export interface HistoricoAcao {
+  id: string;
+  tipo:
+    | "tripulante_criado"
+    | "tripulante_editado"
+    | "reuniao"
+    | "campanha"
+    | "criativo"
+    | "evento_manual"
+    | "observacao";
+  descricao: string;
+  tripulanteId: string | null;
+  tripulanteNome: string;
+  data: string;
+  detalhes?: string;
+}
+
+export async function fetchHistoricoProfissional(profileId: string): Promise<HistoricoAcao[]> {
+  const trips = cache.tripulantes;
+  const trimap: Record<string, string> = {};
+  for (const t of trips) trimap[t.id] = t.name;
+
+  const [tripsRes, reunioesRes, campanhasRes, criativosRes, eventosRes, obsRes] = await Promise.all([
+    supabase
+      .from("tripulantes")
+      .select("id, name, created_at")
+      .eq("autor_id", profileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("reunioes")
+      .select("id, tripulante_id, status, data, horario, created_at, valor_vendas")
+      .eq("autor_id", profileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("campanhas")
+      .select("id, tripulante_id, tipo, descricao, investimento, created_at")
+      .eq("autor_id", profileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("criativos")
+      .select("id, tripulante_id, tipo, status, descricao, created_at")
+      .eq("autor_id", profileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("eventos_manuais")
+      .select("id, tripulante_id, tipo, titulo, descricao, created_at")
+      .eq("autor_id", profileId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("observacoes")
+      .select("id, tripulante_id, texto, created_at")
+      .eq("autor_id", profileId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const acoes: HistoricoAcao[] = [];
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  for (const t of (tripsRes.data ?? []) as any[]) {
+    acoes.push({
+      id: `trip-${t.id}`,
+      tipo: "tripulante_criado",
+      descricao: "Cadastrou tripulante",
+      tripulanteId: t.id,
+      tripulanteNome: t.name,
+      data: t.created_at,
+    });
+  }
+  for (const r of (reunioesRes.data ?? []) as any[]) {
+    const nome = trimap[r.tripulante_id] ?? "—";
+    let desc = `Reunião ${r.status}`;
+    if (r.valor_vendas) desc += ` · vendas R$ ${Number(r.valor_vendas).toLocaleString("pt-BR")}`;
+    acoes.push({
+      id: `reu-${r.id}`,
+      tipo: "reuniao",
+      descricao: desc,
+      tripulanteId: r.tripulante_id,
+      tripulanteNome: nome,
+      data: r.created_at,
+      detalhes: `${r.data} ${r.horario}`,
+    });
+  }
+  for (const c of (campanhasRes.data ?? []) as any[]) {
+    const nome = trimap[c.tripulante_id] ?? "—";
+    const tipoLabel = c.tipo.replace(/_/g, " ");
+    acoes.push({
+      id: `cmp-${c.id}`,
+      tipo: "campanha",
+      descricao: `${tipoLabel}${c.investimento ? ` · R$ ${Number(c.investimento).toLocaleString("pt-BR")}` : ""}`,
+      tripulanteId: c.tripulante_id,
+      tripulanteNome: nome,
+      data: c.created_at,
+      detalhes: c.descricao,
+    });
+  }
+  for (const cr of (criativosRes.data ?? []) as any[]) {
+    const nome = trimap[cr.tripulante_id] ?? "—";
+    acoes.push({
+      id: `cri-${cr.id}`,
+      tipo: "criativo",
+      descricao: `Criativo: ${cr.tipo.replace(/_/g, " ")} · ${cr.status.replace(/_/g, " ")}`,
+      tripulanteId: cr.tripulante_id,
+      tripulanteNome: nome,
+      data: cr.created_at,
+      detalhes: cr.descricao,
+    });
+  }
+  for (const ev of (eventosRes.data ?? []) as any[]) {
+    const nome = trimap[ev.tripulante_id] ?? "—";
+    acoes.push({
+      id: `ev-${ev.id}`,
+      tipo: ev.titulo === "Cadastro atualizado" ? "tripulante_editado" : "evento_manual",
+      descricao: ev.titulo,
+      tripulanteId: ev.tripulante_id,
+      tripulanteNome: nome,
+      data: ev.created_at,
+      detalhes: ev.descricao,
+    });
+  }
+  for (const o of (obsRes.data ?? []) as any[]) {
+    const nome = trimap[o.tripulante_id] ?? "—";
+    acoes.push({
+      id: `obs-${o.id}`,
+      tipo: "observacao",
+      descricao: "Adicionou observação",
+      tripulanteId: o.tripulante_id,
+      tripulanteNome: nome,
+      data: o.created_at,
+      detalhes: o.texto,
+    });
+  }
+  /* eslint-enable */
+
+  acoes.sort((a, b) => b.data.localeCompare(a.data));
+  return acoes;
+}
+
 // ---------- Row mappers ----------
 /* eslint-disable @typescript-eslint/no-explicit-any */
 function mapTripulante(row: any): TripulanteMock {
