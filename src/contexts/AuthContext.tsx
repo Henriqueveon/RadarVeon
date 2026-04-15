@@ -25,6 +25,7 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+// Wrapper de timeout — se uma Promise demorar mais que N ms, resolve com fallback
 function withTimeout<T>(p: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
   return Promise.race([
     p.catch((err) => {
@@ -46,22 +47,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Busca profile com retry automático: se a primeira tentativa demora ou falha,
+  // tenta mais uma vez antes de desistir. Timeout maior (12s) pra tolerar conexões lentas.
   async function fetchProfile(userId: string): Promise<Profile | null> {
-    console.log("[Auth] Buscando profile de", userId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const query = supabase.from("profiles").select("*").eq("id", userId).maybeSingle() as any;
-    const result = await withTimeout<{ data: Profile | null; error: unknown }>(
-      Promise.resolve(query),
-      6000,
-      { data: null, error: null },
-      "fetchProfile"
-    );
-    if (result.error) {
-      console.error("[Auth] fetchProfile error:", result.error);
-      return null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      console.log(`[Auth] fetchProfile tentativa ${attempt}/2 — user ${userId}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const query = supabase.from("profiles").select("*").eq("id", userId).maybeSingle() as any;
+      const result = await withTimeout<{ data: Profile | null; error: unknown }>(
+        Promise.resolve(query),
+        12000,
+        { data: null, error: null },
+        `fetchProfile#${attempt}`
+      );
+      if (result.error) {
+        console.error(`[Auth] fetchProfile erro (tentativa ${attempt}):`, result.error);
+        if (attempt < 2) continue;
+        return null;
+      }
+      if (result.data) {
+        console.log("[Auth] Profile carregado OK");
+        return result.data;
+      }
+      // data null e sem erro: perfil não existe mesmo — não adianta tentar de novo
+      if (attempt === 1 && !result.error) {
+        // Pode ser timeout silencioso — tenta mais uma
+        console.log("[Auth] Profile veio null, retry...");
+        continue;
+      }
     }
-    console.log("[Auth] Profile carregado:", result.data ? "OK" : "NULL");
-    return result.data;
+    return null;
   }
 
   async function refreshProfile() {
@@ -85,6 +100,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("[Auth] getSession resolveu. Session:", s ? "ativa" : "null");
         setSession(s);
         setUser(s?.user ?? null);
+
+        // CRÍTICO: libera o loading ANTES de buscar profile
+        // Se profile hangar, tela de login/pending aparece mesmo assim
         setLoading(false);
 
         if (s?.user) {
@@ -120,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Realtime: escuta mudanças no próprio perfil (approval pelo Almirante)
   useEffect(() => {
     if (!user) return;
     const channel = supabase
@@ -139,13 +158,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user?.id]);
 
+  // Revalida profile quando a tab volta de background (evita estado travado)
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible" && user && !profile) {
+        console.log("[Auth] Tab voltou — refazendo fetchProfile");
+        refreshProfile();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, profile?.id]);
+
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error?.message ?? null };
   }
 
   async function signUp({ nome, email, password, role, observacaoFuncao }: SignUpPayload) {
-    // Passa dados via user_metadata — trigger handle_new_user cria o profile
+    // Passa dados via user_metadata — o trigger handle_new_user cria o profile
+    // automaticamente via SECURITY DEFINER (bypassa RLS, previne erro de auth.uid null)
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -161,7 +194,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message };
     if (!data.user) return { error: "Falha ao criar usuário." };
 
-    // Fallback: se trigger não rodou, tenta insert direto
+    // Fallback: se por algum motivo o trigger não rodou, tenta inserir direto
+    // (Seguro: a policy RLS força approved=false e rejeita role='almirante')
     const { data: existingProfile } = await supabase
       .from("profiles")
       .select("id")
@@ -180,6 +214,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (profileError) {
         console.error("[Auth] signUp profile insert fallback:", profileError);
+        // Não falha o signup — user está criado no auth, o Almirante pode
+        // criar o profile manualmente ou o trigger vai rodar em confirmação
       }
     }
 

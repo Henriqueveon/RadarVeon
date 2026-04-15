@@ -176,7 +176,7 @@ export default function CriativosPage() {
   })();
 
   // Form submit
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (
@@ -191,19 +191,23 @@ export default function CriativosPage() {
       return;
     }
 
-    addCriativo({
-      tripulanteId: form.tripulanteId,
-      data: form.data,
-      tipo: form.tipo as CriativoMock["tipo"],
-      status: form.status as CriativoMock["status"],
-      descricao: form.descricao,
-      responsavel: form.responsavel,
-      linkArquivo: form.linkArquivo,
-    });
-
-    toast.success("Criativo registrado com sucesso!");
-    setForm(INITIAL_FORM);
-    setShowModal(false);
+    try {
+      await addCriativo({
+        tripulanteId: form.tripulanteId,
+        data: form.data,
+        tipo: form.tipo as CriativoMock["tipo"],
+        status: form.status as CriativoMock["status"],
+        descricao: form.descricao,
+        responsavel: form.responsavel,
+        linkArquivo: form.linkArquivo,
+      });
+      toast.success("Criativo registrado com sucesso!");
+      setForm(INITIAL_FORM);
+      setShowModal(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao registrar criativo: ${msg}`);
+    }
   };
 
   // Backdrop click handler

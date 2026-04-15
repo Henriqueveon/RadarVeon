@@ -64,6 +64,10 @@ export async function markAsRead(id: string) {
   await supabase.from("notificacoes").update({ lida: true }).eq("id", id);
 }
 
+export async function deleteNotification(id: string) {
+  await supabase.from("notificacoes").delete().eq("id", id);
+}
+
 export async function markAllAsRead(userId: string) {
   await supabase
     .from("notificacoes")
@@ -84,10 +88,11 @@ export async function approveUser(profileId: string) {
 }
 
 export async function denyUser(profileId: string) {
-  const { error } = await supabase.from("profiles").delete().eq("id", profileId);
+  const { error } = await supabase.rpc("deny_user", { p_user_id: profileId });
   if (error) {
     console.error("denyUser:", error);
-    return { error: error.message };
+    const { error: fallbackErr } = await supabase.from("profiles").delete().eq("id", profileId);
+    if (fallbackErr) return { error: fallbackErr.message };
   }
   return { error: null };
 }

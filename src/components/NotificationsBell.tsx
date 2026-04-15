@@ -6,6 +6,7 @@ import {
   fetchNotifications,
   markAsRead,
   markAllAsRead,
+  deleteNotification,
   approveUser,
   denyUser,
   type Notificacao,
@@ -60,7 +61,7 @@ export function NotificationsBell() {
     loadNotifs();
 
     const channel = supabase
-      .channel("notificacoes")
+      .channel(`notificacoes-${user.id}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "notificacoes" },
@@ -120,7 +121,7 @@ export function NotificationsBell() {
       toast.error("Erro ao aprovar: " + error);
     } else {
       toast.success("Acesso aprovado!");
-      await markAsRead(notif.id);
+      await deleteNotification(notif.id);
       loadNotifs();
     }
   }
@@ -128,7 +129,7 @@ export function NotificationsBell() {
   async function handleDeny(notif: Notificacao) {
     const profileId = notif.link_entity?.replace("profile/", "");
     if (!profileId) return;
-    if (!window.confirm("Negar acesso e excluir esta solicitação?")) return;
+    if (!window.confirm("Negar acesso e apagar todo o cadastro? O usuário poderá tentar cadastro novamente com o mesmo e-mail.")) return;
     setProcessing((prev) => new Set(prev).add(notif.id));
     const { error } = await denyUser(profileId);
     setProcessing((prev) => {
@@ -139,8 +140,8 @@ export function NotificationsBell() {
     if (error) {
       toast.error("Erro ao negar: " + error);
     } else {
-      toast.success("Solicitação negada");
-      await markAsRead(notif.id);
+      toast.success("Solicitação negada e cadastro apagado");
+      await deleteNotification(notif.id);
       loadNotifs();
     }
   }

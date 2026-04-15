@@ -74,18 +74,28 @@ function ReuniaoCard({ reuniao, isExpanded, onToggle }: ReuniaoCardProps) {
   const statusStyle = STATUS_STYLES[reuniao.status];
   const isRealizada = reuniao.status === "realizada";
 
-  function handleTranscricaoBlur(value: string) {
+  async function handleTranscricaoBlur(value: string) {
     if (value !== reuniao.transcricao) {
-      updateReuniao(reuniao.id, { transcricao: value });
-      toast.success("Transcrição atualizada com sucesso!");
+      try {
+        await updateReuniao(reuniao.id, { transcricao: value });
+        toast.success("Transcrição atualizada com sucesso!");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erro desconhecido";
+        toast.error(`Falha ao atualizar transcrição: ${msg}`);
+      }
     }
   }
 
-  function handleDocLinkSave(value: string) {
+  async function handleDocLinkSave(value: string) {
     const trimmed = value.trim();
     if (trimmed && trimmed !== reuniao.linkDocumento) {
-      updateReuniao(reuniao.id, { linkDocumento: trimmed });
-      toast.success("Link salvo com sucesso!");
+      try {
+        await updateReuniao(reuniao.id, { linkDocumento: trimmed });
+        toast.success("Link salvo com sucesso!");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Erro desconhecido";
+        toast.error(`Falha ao salvar link: ${msg}`);
+      }
     }
   }
 
@@ -333,7 +343,7 @@ export default function ReunioesPage() {
     });
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (
@@ -362,25 +372,29 @@ export default function ReunioesPage() {
       return;
     }
 
-    addReuniao({
-      tripulanteId: formData.tripulanteId,
-      tenenteId: formData.tenenteId,
-      data: formData.data,
-      horario: formData.horario,
-      status: formData.status,
-      animo: isRealizada ? formData.animo : "neutro",
-      produtiva: isRealizada ? formData.produtiva : false,
-      vendasDeclaradas: isRealizada ? formData.vendasDeclaradas : false,
-      valorVendas: isRealizada ? valorVendasNum : null,
-      diagnosticoBussola: isRealizada ? formData.diagnosticoBussola : false,
-      transcricao: isRealizada ? formData.transcricao : "",
-      observacoes: isRealizada ? formData.observacoes : "",
-      linkDocumento: "",
-    });
-
-    toast.success("Reunião criada com sucesso!");
-    setIsModalOpen(false);
-    resetForm();
+    try {
+      await addReuniao({
+        tripulanteId: formData.tripulanteId,
+        tenenteId: formData.tenenteId,
+        data: formData.data,
+        horario: formData.horario,
+        status: formData.status,
+        animo: isRealizada ? formData.animo : "neutro",
+        produtiva: isRealizada ? formData.produtiva : false,
+        vendasDeclaradas: isRealizada ? formData.vendasDeclaradas : false,
+        valorVendas: isRealizada ? valorVendasNum : null,
+        diagnosticoBussola: isRealizada ? formData.diagnosticoBussola : false,
+        transcricao: isRealizada ? formData.transcricao : "",
+        observacoes: isRealizada ? formData.observacoes : "",
+        linkDocumento: "",
+      });
+      toast.success("Reunião criada com sucesso!");
+      setIsModalOpen(false);
+      resetForm();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao criar reunião: ${msg}`);
+    }
   }
 
   function updateField<K extends keyof typeof formData>(

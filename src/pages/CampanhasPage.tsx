@@ -129,7 +129,7 @@ export default function CampanhasPage() {
     ? getTripulanteById(selectedTripulanteId)
     : null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (
       !form.data ||
@@ -141,18 +141,23 @@ export default function CampanhasPage() {
       toast.error("Preencha todos os campos obrigatórios.");
       return;
     }
-    addCampanha({
-      tripulanteId: form.tripulanteId,
-      data: form.data,
-      tipo: form.tipo as CampanhaRegistro["tipo"],
-      descricao: form.descricao,
-      responsavel: form.responsavel,
-      investimento: form.investimento ? parseFloat(form.investimento) : 0,
-      resultado: form.resultado,
-    });
-    toast.success("Registro criado com sucesso!");
-    setForm(INITIAL_FORM);
-    setShowModal(false);
+    try {
+      await addCampanha({
+        tripulanteId: form.tripulanteId,
+        data: form.data,
+        tipo: form.tipo as CampanhaRegistro["tipo"],
+        descricao: form.descricao,
+        responsavel: form.responsavel,
+        investimento: form.investimento ? parseFloat(form.investimento) : 0,
+        resultado: form.resultado,
+      });
+      toast.success("Registro criado com sucesso!");
+      setForm(INITIAL_FORM);
+      setShowModal(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao criar registro: ${msg}`);
+    }
   };
 
   const handleCloseModal = () => {

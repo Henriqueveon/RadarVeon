@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LogOut } from "lucide-react";
@@ -85,18 +85,22 @@ function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
   const [jornadaTripulanteId, setJornadaTripulanteId] = useState<string | null>(null);
   const [storeReady, setStoreReady] = useState(false);
+  // Escolhe uma quote aleatória no mount (muda a cada refresh)
   const [quote] = useState(() => getRandomQuote());
 
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    if (profile?.approved) {
-      setCurrentAuthor(profile.id, profile.nome);
-      initializeStore()
-        .then(() => setStoreReady(true))
-        .catch((err) => {
-          console.error("[App] Falha ao inicializar store:", err);
-          setStoreReady(true);
-        });
-    }
+    if (!profile?.approved) return;
+    setCurrentAuthor(profile.id, profile.nome);
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    initializeStore()
+      .then(() => setStoreReady(true))
+      .catch((err) => {
+        console.error("[App] Falha ao inicializar store:", err);
+        setStoreReady(true);
+      });
   }, [profile?.approved, profile?.id, profile?.nome]);
 
   if (!storeReady) {
@@ -185,13 +189,17 @@ function AppShell() {
 }
 
 function Gate() {
-  const { session, profile, loading, signOut, refreshProfile } = useAuth();
+  const { session, profile, loading, signOut } = useAuth();
   const [profileWaitTimeout, setProfileWaitTimeout] = useState(false);
 
+  // Se session existe mas profile ainda é null após 6s, algo travou
   useEffect(() => {
     if (session && !profile && !loading) {
-      const t = setTimeout(() => setProfileWaitTimeout(true), 6000);
+      // Timeout maior (15s) pra tolerar conexão lenta + retry automático
+      const t = setTimeout(() => setProfileWaitTimeout(true), 15000);
       return () => clearTimeout(t);
+    } else {
+      setProfileWaitTimeout(false);
     }
   }, [session, profile, loading]);
 
@@ -208,6 +216,7 @@ function Gate() {
 
   if (!session) return <AuthPage />;
 
+  // Session existe mas profile ainda carregando
   if (session && !profile && !profileWaitTimeout) {
     return (
       <div className="min-h-screen bg-[#191919] flex items-center justify-center">
@@ -219,6 +228,7 @@ function Gate() {
     );
   }
 
+  // Session existe, profile não carregou depois de 6s → problema
   if (session && !profile && profileWaitTimeout) {
     return (
       <div className="min-h-screen bg-[#191919] flex items-center justify-center p-6">
@@ -230,7 +240,7 @@ function Gate() {
           <div className="flex gap-2 justify-center">
             <button
               type="button"
-              onClick={async () => { setProfileWaitTimeout(false); await refreshProfile(); }}
+              onClick={() => window.location.reload()}
               className="rounded border border-white/10 hover:bg-white/5 text-white text-[13px] px-3 py-1.5"
             >
               Tentar novamente

@@ -187,22 +187,27 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
     setCreateOpen(false);
   }
 
-  function handleAddObservacao() {
+  async function handleAddObservacao() {
     if (!newObsText.trim()) {
       toast.error("Digite uma observação antes de salvar.");
       return;
     }
     if (!selectedId) return;
-    addObservacao(selectedId, {
-      texto: newObsText.trim(),
-      autor: "Nicholas",
-      data: new Date().toISOString().split("T")[0],
-    });
-    setNewObsText("");
-    toast.success("Observação salva com sucesso.");
+    try {
+      await addObservacao(selectedId, {
+        texto: newObsText.trim(),
+        autor: "Nicholas",
+        data: new Date().toISOString().split("T")[0],
+      });
+      setNewObsText("");
+      toast.success("Observação salva com sucesso.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao salvar observação: ${msg}`);
+    }
   }
 
-  function handleCreateSubmit(e: React.FormEvent) {
+  async function handleCreateSubmit(e: React.FormEvent) {
     e.preventDefault();
     const { name, loja, cidade, uf, phone, email, tenente, plano } = newForm;
     if (!name || !loja || !cidade || !uf || !phone || !email || !tenente || !plano) {
@@ -217,25 +222,29 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
       .map((w) => w[0].toUpperCase())
       .join("");
 
-    addTripulante({
-      name,
-      loja,
-      cidade,
-      uf,
-      phone,
-      email,
-      tenente,
-      plano,
-      status: "ativo",
-      dataEntrada: new Date().toISOString().split("T")[0],
-      avatar: initials || "??",
-    });
-
-    toast.success(`Tripulante "${name}" criado com sucesso!`);
-    closeCreate();
+    try {
+      await addTripulante({
+        name,
+        loja,
+        cidade,
+        uf,
+        phone,
+        email,
+        tenente,
+        plano,
+        status: "ativo",
+        dataEntrada: new Date().toISOString().split("T")[0],
+        avatar: initials || "??",
+      });
+      toast.success(`Tripulante "${name}" criado com sucesso!`);
+      closeCreate();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao criar tripulante: ${msg}`);
+    }
   }
 
-  function handleEditSubmit(e: React.FormEvent) {
+  async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedTripulante) return;
     const { name, loja, cidade, uf, phone, email, tenente, plano } = editForm;
@@ -243,29 +252,39 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
       toast.error("Preencha todos os campos obrigatórios.");
       return;
     }
-    updateTripulante(selectedTripulante.id, {
-      name,
-      loja,
-      cidade,
-      uf,
-      phone,
-      email,
-      tenente,
-      plano,
-    });
-    toast.success("Tripulante atualizado!");
-    setEditOpen(false);
+    try {
+      await updateTripulante(selectedTripulante.id, {
+        name,
+        loja,
+        cidade,
+        uf,
+        phone,
+        email,
+        tenente,
+        plano,
+      });
+      toast.success("Tripulante atualizado!");
+      setEditOpen(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao atualizar tripulante: ${msg}`);
+    }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!selectedTripulante) return;
     const confirmed = window.confirm(
       `Tem certeza que deseja excluir "${selectedTripulante.name}"? Esta ação não pode ser desfeita.`
     );
     if (!confirmed) return;
-    deleteTripulante(selectedTripulante.id);
-    toast.success(`Tripulante "${selectedTripulante.name}" excluído com sucesso.`);
-    closeDetail();
+    try {
+      await deleteTripulante(selectedTripulante.id);
+      toast.success(`Tripulante "${selectedTripulante.name}" excluído com sucesso.`);
+      closeDetail();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao excluir tripulante: ${msg}`);
+    }
   }
 
   // --- Import handlers ---
@@ -292,7 +311,7 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
     setImportErrors(errors);
   }
 
-  function handleConfirmImport() {
+  async function handleConfirmImport() {
     const validRows = importPreview.filter((r) => r.valid);
     if (validRows.length === 0) {
       toast.error("Nenhuma linha válida para importar.");
@@ -300,6 +319,7 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
     }
 
     let imported = 0;
+    let failed = 0;
     for (const row of validRows) {
       const initials = row.name
         .split(" ")
@@ -308,23 +328,32 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
         .slice(0, 2)
         .toUpperCase();
 
-      addTripulante({
-        name: row.name,
-        loja: row.loja || "",
-        cidade: row.cidade || "Não informada",
-        uf: row.uf || "XX",
-        phone: row.phone || "",
-        email: row.email || "",
-        tenente: row.tenente || "Não atribuído",
-        status: "ativo",
-        dataEntrada: new Date().toISOString().split("T")[0],
-        avatar: initials,
-        plano: row.plano || "Plano Completo",
-      });
-      imported++;
+      try {
+        await addTripulante({
+          name: row.name,
+          loja: row.loja || "",
+          cidade: row.cidade || "Não informada",
+          uf: row.uf || "XX",
+          phone: row.phone || "",
+          email: row.email || "",
+          tenente: row.tenente || "Não atribuído",
+          status: "ativo",
+          dataEntrada: new Date().toISOString().split("T")[0],
+          avatar: initials,
+          plano: row.plano || "Plano Completo",
+        });
+        imported++;
+      } catch {
+        failed++;
+      }
     }
 
-    toast.success(`${imported} tripulante${imported > 1 ? "s" : ""} importado${imported > 1 ? "s" : ""} com sucesso!`);
+    if (failed > 0) {
+      toast.error(`Falha ao importar ${failed} linha${failed > 1 ? "s" : ""}.`);
+    }
+    if (imported > 0) {
+      toast.success(`${imported} tripulante${imported > 1 ? "s" : ""} importado${imported > 1 ? "s" : ""} com sucesso!`);
+    }
     setImportOpen(false);
     setImportPreview([]);
     setImportErrors([]);

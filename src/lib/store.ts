@@ -294,8 +294,16 @@ function hydrateObservacoes() {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let realtimeChannel: any = null;
+
 function subscribeRealtime() {
-  supabase
+  if (realtimeChannel) {
+    supabase.removeChannel(realtimeChannel);
+    realtimeChannel = null;
+  }
+
+  realtimeChannel = supabase
     .channel("store_sync")
     .on("postgres_changes", { event: "*", schema: "public", table: "tripulantes" }, async () => {
       const { data } = await supabase.from("tripulantes").select("*").order("created_at", { ascending: false });

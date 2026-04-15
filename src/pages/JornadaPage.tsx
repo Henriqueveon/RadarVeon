@@ -420,7 +420,8 @@ function TimelineEventCard({ event, isLast }: { event: TimelineEvent; isLast: bo
       }
       toast.success("Evento removido da jornada");
     } catch (err) {
-      toast.error("Erro ao remover evento");
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao remover evento: ${msg}`);
     }
   };
 
@@ -540,7 +541,7 @@ function RegistrarEventoModal({ tripulanteId, open, onClose }: ModalProps) {
 
   if (!open) return null;
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!titulo.trim()) {
       toast.error("Informe um título para o evento.");
@@ -552,7 +553,7 @@ function RegistrarEventoModal({ tripulanteId, open, onClose }: ModalProps) {
     }
     setSubmitting(true);
     try {
-      addEventoManual({
+      await addEventoManual({
         tripulanteId,
         tipo,
         titulo: titulo.trim(),
@@ -565,6 +566,9 @@ function RegistrarEventoModal({ tripulanteId, open, onClose }: ModalProps) {
       setDescricao("");
       setTipo("observacao");
       onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast.error(`Falha ao registrar evento: ${msg}`);
     } finally {
       setSubmitting(false);
     }
