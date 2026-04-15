@@ -145,23 +145,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp({ nome, email, password, role, observacaoFuncao }: SignUpPayload) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    // Passa dados via user_metadata — trigger handle_new_user cria o profile
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          nome,
+          role,
+          observacao_funcao: observacaoFuncao,
+          avatar_iniciais: getInitials(nome),
+        },
+      },
+    });
     if (error) return { error: error.message };
     if (!data.user) return { error: "Falha ao criar usuário." };
 
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: data.user.id,
-      nome,
-      email,
-      role,
-      observacao_funcao: observacaoFuncao,
-      avatar_iniciais: getInitials(nome),
-      approved: false,
-    });
+    // Fallback: se trigger não rodou, tenta insert direto
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", data.user.id)
+      .maybeSingle();
 
-    if (profileError) {
-      console.error("signUp profile insert:", profileError);
-      return { error: "Conta criada mas falha ao salvar perfil: " + profileError.message };
+    if (!existingProfile) {
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: data.user.id,
+        nome,
+        email,
+        role,
+        observacao_funcao: observacaoFuncao,
+        avatar_iniciais: getInitials(nome),
+        approved: false,
+      });
+      if (profileError) {
+        console.error("[Auth] signUp profile insert fallback:", profileError);
+      }
     }
 
     return { error: null };
