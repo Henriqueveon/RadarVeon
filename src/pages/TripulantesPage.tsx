@@ -28,8 +28,10 @@ import {
   deleteTripulante,
   updateTripulante,
   computeKPIs,
+  getTeam,
 } from "@/lib/store";
-import { tenentes, formatCurrency } from "@/lib/mock-data";
+import { useAuth } from "@/contexts/AuthContext";
+import { formatCurrency } from "@/lib/mock-data";
 import type { TripulanteMock } from "@/lib/mock-data";
 
 const PLANOS = ["Plano Completo", "Plano Essencial"];
@@ -128,6 +130,8 @@ interface TripulantesPageProps {
 
 export default function TripulantesPage({ onNavigateJornada }: TripulantesPageProps) {
   useStore();
+  useAuth(); // Auth context para garantir sessão
+  const team = getTeam();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("todos");
@@ -565,7 +569,7 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
               <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
                 <DetailRow icon={Phone} label="Telefone" value={selectedTripulante.phone} />
                 <DetailRow icon={Mail} label="E-mail" value={selectedTripulante.email} />
-                <DetailRow icon={Shield} label="Tenente" value={selectedTripulante.tenente} />
+                <DetailRow icon={Shield} label="Responsável" value={selectedTripulante.tenente} />
                 <DetailRow icon={FileText} label="Plano" value={selectedTripulante.plano} />
                 <DetailRow
                   icon={CalendarDays}
@@ -798,21 +802,21 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
               />
               <div>
                 <label
-                  htmlFor="create-tenente"
+                  htmlFor="create-responsavel"
                   className="mb-1 block text-xs font-medium text-[#9b9b9b]"
                 >
-                  Tenente responsável
+                  Responsável
                 </label>
                 <select
-                  id="create-tenente"
+                  id="create-responsavel"
                   value={newForm.tenente}
                   onChange={(e) => setNewForm((f) => ({ ...f, tenente: e.target.value }))}
                   className="w-full"
                 >
-                  <option value="">Selecione</option>
-                  {tenentes.map((ten) => (
-                    <option key={ten.id} value={ten.name}>
-                      {ten.name}
+                  <option value="">Selecionar responsável</option>
+                  {team.map((ten) => (
+                    <option key={ten.id} value={ten.nome}>
+                      {ten.nome} — {ten.role}
                     </option>
                   ))}
                 </select>
@@ -938,21 +942,21 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
               />
               <div>
                 <label
-                  htmlFor="edit-tenente"
+                  htmlFor="edit-responsavel"
                   className="mb-1 block text-xs font-medium text-[#9b9b9b]"
                 >
-                  Tenente responsável
+                  Responsável
                 </label>
                 <select
-                  id="edit-tenente"
+                  id="edit-responsavel"
                   value={editForm.tenente}
                   onChange={(e) => setEditForm((f) => ({ ...f, tenente: e.target.value }))}
                   className="w-full"
                 >
-                  <option value="">Selecione</option>
-                  {tenentes.map((ten) => (
-                    <option key={ten.id} value={ten.name}>
-                      {ten.name}
+                  <option value="">Selecionar responsável</option>
+                  {team.map((ten) => (
+                    <option key={ten.id} value={ten.nome}>
+                      {ten.nome} — {ten.role}
                     </option>
                   ))}
                 </select>
