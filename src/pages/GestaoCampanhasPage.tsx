@@ -31,6 +31,7 @@ import {
   deleteColuna,
   getActiveTripulantes,
   getTripulanteById,
+  demandasTablesReady,
   type Demanda,
   type DemandaColuna,
 } from "@/lib/store";
@@ -176,6 +177,8 @@ export default function GestaoCampanhasPage() {
     };
   }, [dataRef, periodo]);
 
+  const [tablesMissing, setTablesMissing] = useState(false);
+
   /* ------------------- Load ------------------- */
   useEffect(() => {
     let mounted = true;
@@ -186,9 +189,14 @@ export default function GestaoCampanhasPage() {
         setColunas(cols);
         setDemandas(dems);
         setLoading(false);
+        // Detecta se as tabelas ainda não foram criadas no Supabase
+        setTablesMissing(!demandasTablesReady());
       })
       .catch(() => {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          setTablesMissing(!demandasTablesReady());
+        }
       });
     return () => {
       mounted = false;
@@ -408,7 +416,18 @@ export default function GestaoCampanhasPage() {
         )}
 
         {/* Content */}
-        {loading ? (
+        {tablesMissing ? (
+          <div className="rounded-lg border border-[#d79b3f]/30 bg-[#d79b3f]/5 p-6 text-center">
+            <p className="text-[14px] font-semibold text-[#d79b3f]">Configuração pendente</p>
+            <p className="mt-2 text-[13px] text-[#9b9b9b]">
+              As tabelas <code className="text-white">demandas</code> e{" "}
+              <code className="text-white">demanda_colunas</code> ainda não foram criadas no Supabase.
+            </p>
+            <p className="mt-2 text-[12px] text-[#6f6f6f]">
+              Peça ao Almirante para rodar a migration <code className="text-white">v8</code> no SQL Editor do Supabase.
+            </p>
+          </div>
+        ) : loading ? (
           <div className="text-center py-24 text-[#6f6f6f] text-sm">Carregando...</div>
         ) : filteredDemandas.length === 0 && periodo !== "mes" ? (
           <div className="text-center py-24 text-[#6f6f6f] text-sm">

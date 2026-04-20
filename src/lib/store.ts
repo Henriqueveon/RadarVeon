@@ -1204,3 +1204,178 @@ export function getTripulanteHealth(tripulanteId: string) {
     ultimoContato,
   };
 }
+
+// ============================================================
+// DEMANDAS (Kanban "Gestão de Campanhas")
+// ============================================================
+
+export interface DemandaColuna {
+  id: string;
+  nome: string;
+  cor: string;
+  ordem: number;
+}
+
+export interface Demanda {
+  id: string;
+  titulo: string;
+  descricao: string;
+  tripulanteId: string | null;
+  colunaId: string;
+  dataDemanda: string;
+  responsavelNome: string;
+  autorId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  autorNome?: string;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function mapDemanda(row: any): Demanda {
+  return {
+    id: row.id,
+    titulo: row.titulo,
+    descricao: row.descricao ?? "",
+    tripulanteId: row.tripulante_id,
+    colunaId: row.coluna_id,
+    dataDemanda: row.data_demanda,
+    responsavelNome: row.responsavel_nome ?? "",
+    autorId: row.autor_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapColuna(row: any): DemandaColuna {
+  return {
+    id: row.id,
+    nome: row.nome,
+    cor: row.cor ?? "gray",
+    ordem: row.ordem ?? 0,
+  };
+}
+/* eslint-enable */
+
+// Flag global: se as tabelas de demandas ainda não foram criadas no Supabase
+let demandasTablesMissing = false;
+
+export function demandasTablesReady(): boolean {
+  return !demandasTablesMissing;
+}
+
+export async function fetchColunas(): Promise<DemandaColuna[]> {
+  const { data, error } = await supabase
+    .from("demanda_colunas")
+    .select("*")
+    .order("ordem");
+  if (error) {
+    console.error("[store] fetchColunas:", error);
+    // Código PGRST205 = tabela não existe (migration v8 não rodada)
+    if (error.code === "PGRST205" || error.code === "42P01") {
+      demandasTablesMissing = true;
+    }
+    return [];
+  }
+  demandasTablesMissing = false;
+  return (data ?? []).map(mapColuna);
+}
+
+export async function fetchDemandas(dataInicio: string, dataFim: string): Promise<Demanda[]> {
+  const { data, error } = await supabase
+    .from("demandas")
+    .select("*, autor:profiles!demandas_autor_id_fkey(nome)")
+    .gte("data_demanda", dataInicio)
+    .lte("data_demanda", dataFim)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[store] fetchDemandas:", error);
+    return [];
+  }
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  return (data ?? []).map((row: any) => ({
+    ...mapDemanda(row),
+    autorNome: row.autor?.nome ?? "—",
+  }));
+  /* eslint-enable */
+}
+
+export async function addDemanda(input: {
+  titulo: string;
+  descricao?: string;
+  tripulanteId?: string | null;
+  colunaId?: string;
+  dataDemanda: string;
+  responsavelNome?: string;
+}) {
+  const { data, error } = await supabase
+    .from("demandas")
+    .insert({
+      titulo: input.titulo,
+      descricao: input.descricao ?? "",
+      tripulante_id: input.tripulanteId ?? null,
+      coluna_id: input.colunaId ?? "nao_iniciado",
+      data_demanda: input.dataDemanda,
+      responsavel_nome: input.responsavelNome ?? currentAuthorName,
+      autor_id: currentAuthorId,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  notify();
+  return mapDemanda(data);
+}
+
+export async function updateDemanda(id: string, updates: Partial<Demanda>) {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const dbUpdates: any = {};
+  if ("titulo" in updates) dbUpdates.titulo = updates.titulo;
+  if ("descricao" in updates) dbUpdates.descricao = updates.descricao;
+  if ("tripulanteId" in updates) dbUpdates.tripulante_id = updates.tripulanteId;
+  if ("colunaId" in updates) dbUpdates.coluna_id = updates.colunaId;
+  if ("dataDemanda" in updates) dbUpdates.data_demanda = updates.dataDemanda;
+  if ("responsavelNome" in updates) dbUpdates.responsavel_nome = updates.responsavelNome;
+  /* eslint-enable */
+
+  const { error } = await supabase.from("demandas").update(dbUpdates).eq("id", id);
+  if (error) throw error;
+  notify();
+}
+
+export async function deleteDemanda(id: string) {
+  const { error } = await supabase.from("demandas").delete().eq("id", id);
+  if (error) throw error;
+  notify();
+}
+
+export async function addColuna(nome: string, cor: string = "gray") {
+  const id = nome.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const { data: existing } = await supabase.from("demanda_colunas").select("ordem").order("ordem", { ascending: false }).limit(1).maybeSingle();
+  const ordem = (existing?.ordem ?? -1) + 1;
+  const { error } = await supabase.from("demanda_colunas").insert({
+    id: `${id}_${Date.now().toString().slice(-4)}`,
+    nome,
+    cor,
+    ordem,
+    autor_id: currentAuthorId,
+  });
+  if (error) throw error;
+  notify();
+}
+
+export async function updateColuna(id: string, updates: { nome?: string; cor?: string; ordem?: number }) {
+  const { error } = await supabase.from("demanda_colunas").update(updates).eq("id", id);
+  if (error) throw error;
+  notify();
+}
+
+export async function deleteColuna(id: string) {
+  // Não permite deletar as 3 padrão (evita perder demandas)
+  if (["nao_iniciado", "em_andamento", "concluido"].includes(id)) {
+    throw new Error("Colunas padrão não podem ser excluídas");
+  }
+  // Move demandas dessa coluna para 'nao_iniciado' antes de deletar
+  await supabase.from("demandas").update({ coluna_id: "nao_iniciado" }).eq("coluna_id", id);
+  const { error } = await supabase.from("demanda_colunas").delete().eq("id", id);
+  if (error) throw error;
+  notify();
+}
