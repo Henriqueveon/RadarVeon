@@ -12,7 +12,7 @@ import { getRandomQuote } from "@/lib/mission-quotes";
 
 import DashboardPage from "@/pages/DashboardPage";
 import TripulantesPage from "@/pages/TripulantesPage";
-import CampanhasPage from "@/pages/CampanhasPage";
+import GestaoCampanhasPage from "@/pages/GestaoCampanhasPage";
 import ReunioesPage from "@/pages/ReunioesPage";
 import CriativosPage from "@/pages/CriativosPage";
 import JornadaPage from "@/pages/JornadaPage";
@@ -21,7 +21,7 @@ import ProfissionaisPage from "@/pages/ProfissionaisPage";
 const TABS = [
   { id: "dashboard", label: "Visão Geral" },
   { id: "tripulantes", label: "Tripulantes" },
-  { id: "campanhas", label: "Campanhas" },
+  { id: "campanhas", label: "Gestão de Campanhas" },
   { id: "reunioes", label: "Reuniões" },
   { id: "criativos", label: "Criativos" },
   { id: "jornada", label: "Jornada" },
@@ -171,7 +171,7 @@ function AppShell() {
         <div key={activeTab} className="animate-in">
           {activeTab === "dashboard" && <DashboardPage onNavigateJornada={navigateToJornada} />}
           {activeTab === "tripulantes" && <TripulantesPage onNavigateJornada={navigateToJornada} />}
-          {activeTab === "campanhas" && <CampanhasPage />}
+          {activeTab === "campanhas" && <GestaoCampanhasPage />}
           {activeTab === "reunioes" && <ReunioesPage />}
           {activeTab === "criativos" && <CriativosPage />}
           {activeTab === "jornada" && (
