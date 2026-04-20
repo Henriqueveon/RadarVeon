@@ -193,75 +193,40 @@ function AppShell() {
 
 function Gate() {
   const { session, profile, loading, signOut } = useAuth();
-  const [profileWaitTimeout, setProfileWaitTimeout] = useState(false);
 
-  // Se session existe mas profile ainda é null após 6s, algo travou
+  // Se profile não carrega em 4s, limpa sessão e volta pro login.
+  // Isso evita spinner infinito quando JWT expira ou conexão oscila.
+  // O user reloga em 3s e entra direto — muito melhor que ficar preso.
   useEffect(() => {
     if (session && !profile && !loading) {
-      // Timeout maior (15s) pra tolerar conexão lenta + retry automático
-      const t = setTimeout(() => setProfileWaitTimeout(true), 15000);
+      const t = setTimeout(async () => {
+        console.warn("[Gate] Profile não carregou em 4s — forçando re-login");
+        await signOut();
+      }, 4000);
       return () => clearTimeout(t);
-    } else {
-      setProfileWaitTimeout(false);
     }
-  }, [session, profile, loading]);
+  }, [session, profile, loading, signOut]);
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#191919] flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
-          <p className="text-[12px] text-[#6f6f6f]">Verificando sessão...</p>
-        </div>
+        <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
       </div>
     );
   }
 
   if (!session) return <AuthPage />;
 
-  // Session existe mas profile ainda carregando
-  if (session && !profile && !profileWaitTimeout) {
+  // Profile ainda carregando (máx 4s antes de auto-logout)
+  if (!profile) {
     return (
       <div className="min-h-screen bg-[#191919] flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
-          <p className="text-[12px] text-[#6f6f6f]">Carregando perfil...</p>
-        </div>
+        <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
       </div>
     );
   }
 
-  // Session existe, profile não carregou depois de 6s → problema
-  if (session && !profile && profileWaitTimeout) {
-    return (
-      <div className="min-h-screen bg-[#191919] flex items-center justify-center p-6">
-        <div className="max-w-md text-center space-y-4">
-          <p className="text-[14px] text-white">Não foi possível carregar seu perfil.</p>
-          <p className="text-[12px] text-[#9b9b9b]">
-            Pode ser um problema de conexão ou seu perfil não existe no banco.
-          </p>
-          <div className="flex gap-2 justify-center">
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="rounded border border-white/10 hover:bg-white/5 text-white text-[13px] px-3 py-1.5"
-            >
-              Tentar novamente
-            </button>
-            <button
-              type="button"
-              onClick={signOut}
-              className="rounded border border-white/10 hover:bg-white/5 text-[#9b9b9b] text-[13px] px-3 py-1.5"
-            >
-              Sair e entrar de novo
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (profile && !profile.approved) return <PendingApprovalPage />;
+  if (!profile.approved) return <PendingApprovalPage />;
   return <AppShell />;
 }
 

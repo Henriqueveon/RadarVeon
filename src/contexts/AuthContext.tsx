@@ -50,13 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Busca profile com retry automático: se a primeira tentativa demora ou falha,
   // tenta mais uma vez antes de desistir. Timeout maior (12s) pra tolerar conexões lentas.
   async function fetchProfile(userId: string): Promise<Profile | null> {
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      console.log(`[Auth] fetchProfile tentativa ${attempt}/2 — user ${userId}`);
+    for (let attempt = 1; attempt <= 1; attempt++) {
+      console.log(`[Auth] fetchProfile — user ${userId}`);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const query = supabase.from("profiles").select("*").eq("id", userId).maybeSingle() as any;
       const result = await withTimeout<{ data: Profile | null; error: unknown }>(
         Promise.resolve(query),
-        12000,
+        3500,
         { data: null, error: null },
         `fetchProfile#${attempt}`
       );
@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     withTimeout(
       supabase.auth.getSession(),
-      6000,
+      3000,
       { data: { session: null }, error: null },
       "getSession"
     )
