@@ -7,7 +7,6 @@ import {
   Mail,
   User,
   CalendarDays,
-  Shield,
   FileText,
   Handshake,
   DollarSign,
@@ -28,7 +27,6 @@ import {
   deleteTripulante,
   updateTripulante,
   computeKPIs,
-  getTeam,
 } from "@/lib/store";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/mock-data";
@@ -130,8 +128,7 @@ interface TripulantesPageProps {
 
 export default function TripulantesPage({ onNavigateJornada }: TripulantesPageProps) {
   useStore();
-  useAuth(); // Auth context para garantir sessão
-  const team = getTeam();
+  useAuth();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"todos" | "ativo" | "inativo">("todos");
@@ -214,8 +211,8 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
   async function handleCreateSubmit(e: React.FormEvent) {
     e.preventDefault();
     const { name, loja, cidade, uf, phone, email, tenente, plano } = newForm;
-    if (!name || !loja || !cidade || !uf || !phone || !email || !tenente || !plano) {
-      toast.error("Preencha todos os campos obrigatórios.");
+    if (!name) {
+      toast.error("O nome é obrigatório.");
       return;
     }
 
@@ -252,8 +249,8 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
     e.preventDefault();
     if (!selectedTripulante) return;
     const { name, loja, cidade, uf, phone, email, tenente, plano } = editForm;
-    if (!name || !loja || !cidade || !uf || !phone || !email || !tenente || !plano) {
-      toast.error("Preencha todos os campos obrigatórios.");
+    if (!name) {
+      toast.error("O nome é obrigatório.");
       return;
     }
     try {
@@ -569,7 +566,7 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
               <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
                 <DetailRow icon={Phone} label="Telefone" value={selectedTripulante.phone} />
                 <DetailRow icon={Mail} label="E-mail" value={selectedTripulante.email} />
-                <DetailRow icon={Shield} label="Responsável" value={selectedTripulante.tenente} />
+                {/* Responsável removido — toda equipe atende todos os tripulantes */}
                 <DetailRow icon={FileText} label="Plano" value={selectedTripulante.plano} />
                 <DetailRow
                   icon={CalendarDays}
@@ -800,27 +797,7 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
                 placeholder="email@exemplo.com.br"
                 type="email"
               />
-              <div>
-                <label
-                  htmlFor="create-responsavel"
-                  className="mb-1 block text-xs font-medium text-[#9b9b9b]"
-                >
-                  Responsável
-                </label>
-                <select
-                  id="create-responsavel"
-                  value={newForm.tenente}
-                  onChange={(e) => setNewForm((f) => ({ ...f, tenente: e.target.value }))}
-                  className="w-full"
-                >
-                  <option value="">Selecionar responsável</option>
-                  {team.map((ten) => (
-                    <option key={ten.id} value={ten.nome}>
-                      {ten.nome} — {ten.role}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Campo responsável removido — toda equipe atende todos os tripulantes */}
               <div>
                 <label
                   htmlFor="create-plano"
@@ -940,27 +917,7 @@ export default function TripulantesPage({ onNavigateJornada }: TripulantesPagePr
                 placeholder="email@exemplo.com.br"
                 type="email"
               />
-              <div>
-                <label
-                  htmlFor="edit-responsavel"
-                  className="mb-1 block text-xs font-medium text-[#9b9b9b]"
-                >
-                  Responsável
-                </label>
-                <select
-                  id="edit-responsavel"
-                  value={editForm.tenente}
-                  onChange={(e) => setEditForm((f) => ({ ...f, tenente: e.target.value }))}
-                  className="w-full"
-                >
-                  <option value="">Selecionar responsável</option>
-                  {team.map((ten) => (
-                    <option key={ten.id} value={ten.nome}>
-                      {ten.nome} — {ten.role}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Campo responsável removido — toda equipe atende todos os tripulantes */}
               <div>
                 <label
                   htmlFor="edit-plano"
