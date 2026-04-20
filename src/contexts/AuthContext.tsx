@@ -4,6 +4,37 @@ import { supabase } from "@/lib/supabase";
 import type { Profile, UserRole } from "@/lib/auth-types";
 import { getInitials } from "@/lib/auth-types";
 
+// ============================================================
+// Estratégia: Cache do profile no localStorage ("stale-while-revalidate")
+//
+// 1. Abre app → lê profile do cache → entra IMEDIATAMENTE (0ms)
+// 2. Em background, revalida com Supabase
+// 3. Se Supabase responde → atualiza cache + state
+// 4. Se falha → mantém cache → app funciona normalmente
+//
+// Resultado: ZERO spinners de "carregando perfil" após o primeiro login.
+// ============================================================
+
+const PROFILE_CACHE_KEY = "rv_profile";
+
+function getCachedProfile(): Profile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // cache corrompido
+  }
+  return null;
+}
+
+function setCachedProfile(p: Profile | null) {
+  if (p) {
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p));
+  } else {
+    localStorage.removeItem(PROFILE_CACHE_KEY);
+  }
+}
+
 interface SignUpPayload {
   nome: string;
   email: string;
@@ -25,110 +56,87 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-// Wrapper de timeout — se uma Promise demorar mais que N ms, resolve com fallback
-function withTimeout<T>(p: Promise<T>, ms: number, fallback: T, label: string): Promise<T> {
-  return Promise.race([
-    p.catch((err) => {
-      console.error(`[Auth] ${label} ERRO:`, err);
-      return fallback;
-    }),
-    new Promise<T>((resolve) =>
-      setTimeout(() => {
-        console.warn(`[Auth] ${label} TIMEOUT após ${ms}ms — usando fallback`);
-        resolve(fallback);
-      }, ms)
-    ),
-  ]);
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(getCachedProfile);
   const [loading, setLoading] = useState(true);
 
-  // Busca profile com retry automático: se a primeira tentativa demora ou falha,
-  // tenta mais uma vez antes de desistir. Timeout maior (12s) pra tolerar conexões lentas.
+  function updateProfile(p: Profile | null) {
+    setProfile(p);
+    setCachedProfile(p);
+  }
+
   async function fetchProfile(userId: string): Promise<Profile | null> {
-    for (let attempt = 1; attempt <= 1; attempt++) {
-      console.log(`[Auth] fetchProfile — user ${userId}`);
+    try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const query = supabase.from("profiles").select("*").eq("id", userId).maybeSingle() as any;
-      const result = await withTimeout<{ data: Profile | null; error: unknown }>(
-        Promise.resolve(query),
-        3500,
-        { data: null, error: null },
-        `fetchProfile#${attempt}`
-      );
-      if (result.error) {
-        console.error(`[Auth] fetchProfile erro (tentativa ${attempt}):`, result.error);
-        if (attempt < 2) continue;
+      const { data, error } = await (supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle() as any);
+      if (error) {
+        console.error("[Auth] fetchProfile erro:", error);
         return null;
       }
-      if (result.data) {
-        console.log("[Auth] Profile carregado OK");
-        return result.data;
-      }
-      // data null e sem erro: perfil não existe mesmo — não adianta tentar de novo
-      if (attempt === 1 && !result.error) {
-        // Pode ser timeout silencioso — tenta mais uma
-        console.log("[Auth] Profile veio null, retry...");
-        continue;
-      }
+      return data as Profile | null;
+    } catch (err) {
+      console.error("[Auth] fetchProfile exception:", err);
+      return null;
     }
-    return null;
   }
 
   async function refreshProfile() {
     if (!user) return;
     const p = await fetchProfile(user.id);
-    setProfile(p);
+    if (p) updateProfile(p);
   }
 
   useEffect(() => {
     let mounted = true;
-    console.log("[Auth] Inicializando...");
 
-    withTimeout(
-      supabase.auth.getSession(),
-      3000,
-      { data: { session: null }, error: null },
-      "getSession"
-    )
+    supabase.auth
+      .getSession()
       .then(async ({ data: { session: s } }) => {
         if (!mounted) return;
-        console.log("[Auth] getSession resolveu. Session:", s ? "ativa" : "null");
         setSession(s);
         setUser(s?.user ?? null);
-
-        // CRÍTICO: libera o loading ANTES de buscar profile
-        // Se profile hangar, tela de login/pending aparece mesmo assim
         setLoading(false);
 
         if (s?.user) {
-          const p = await fetchProfile(s.user.id);
-          if (mounted) setProfile(p);
+          // Se tem cache, entra imediatamente. Revalida em background.
+          const cached = getCachedProfile();
+          if (cached && cached.id === s.user.id) {
+            setProfile(cached);
+          }
+          // Busca fresh do Supabase (em background, sem bloquear)
+          const fresh = await fetchProfile(s.user.id);
+          if (mounted && fresh) {
+            updateProfile(fresh);
+          }
+        } else {
+          // Sem sessão → limpa cache
+          updateProfile(null);
         }
       })
       .catch((err) => {
-        console.error("[Auth] getSession erro fatal:", err);
+        console.error("[Auth] getSession erro:", err);
         if (mounted) setLoading(false);
       });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, s) => {
+    } = supabase.auth.onAuthStateChange(async (_event, s) => {
       if (!mounted) return;
-      console.log("[Auth] onAuthStateChange:", event);
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
 
       if (s?.user) {
         const p = await fetchProfile(s.user.id);
-        if (mounted) setProfile(p);
+        if (mounted && p) updateProfile(p);
       } else {
-        setProfile(null);
+        updateProfile(null);
       }
     });
 
@@ -148,28 +156,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` },
         (payload) => {
           const updated = payload.new as Profile;
-          setProfile(updated);
+          updateProfile(updated);
         }
       )
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
   }, [user?.id]);
 
-  // Revalida profile quando a tab volta de background (evita estado travado)
+  // Revalida quando tab volta de background
   useEffect(() => {
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible" && user && !profile) {
-        console.log("[Auth] Tab voltou — refazendo fetchProfile");
+    function handleVisibility() {
+      if (document.visibilityState === "visible" && user) {
         refreshProfile();
       }
     }
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, profile?.id]);
+  }, [user?.id]);
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -177,8 +183,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signUp({ nome, email, password, role, observacaoFuncao }: SignUpPayload) {
-    // v7: sem trigger no Supabase. Signup em auth.users é isolado e rápido.
-    // O profile é criado logo após via RPC ensure_profile.
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -194,13 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: error.message };
     if (!data.user) return { error: "Falha ao criar usuário." };
 
-    // Aguarda a session estabilizar antes de chamar RPC (precisa de auth.uid)
     await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Fallback robusto: tenta criar profile via RPC (função ensure_profile).
-    // Essa função roda como SECURITY DEFINER e é idempotente.
-    // Se o trigger já criou, não faz nada. Se não criou, cria agora.
-    // Usamos RPC em vez de insert direto pra evitar issues de RLS/session.
     try {
       const { error: rpcError } = await supabase.rpc("ensure_profile", {
         p_nome: nome,
@@ -209,28 +208,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         p_avatar: getInitials(nome),
       });
       if (rpcError) {
-        console.warn("[Auth] ensure_profile RPC falhou, tentando insert direto:", rpcError);
-        // Segundo fallback: insert direto (caso RPC não exista ainda no Supabase)
-        const { data: existingProfile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("id", data.user.id)
-          .maybeSingle();
-        if (!existingProfile) {
-          await supabase.from("profiles").insert({
-            id: data.user.id,
-            nome,
-            email,
-            role,
-            observacao_funcao: observacaoFuncao,
-            avatar_iniciais: getInitials(nome),
-            approved: false,
-          });
-        }
+        console.warn("[Auth] ensure_profile falhou, tentando insert:", rpcError);
+        await supabase.from("profiles").insert({
+          id: data.user.id,
+          nome,
+          email,
+          role,
+          observacao_funcao: observacaoFuncao,
+          avatar_iniciais: getInitials(nome),
+          approved: false,
+        });
       }
     } catch (err) {
-      console.error("[Auth] Falha em fallback de profile:", err);
-      // Ainda retorna sucesso — user existe em auth.users, Almirante pode criar profile manualmente
+      console.error("[Auth] Fallback de profile:", err);
     }
 
     return { error: null };
@@ -240,7 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
-    setProfile(null);
+    updateProfile(null);
   }
 
   return (

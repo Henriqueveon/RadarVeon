@@ -192,41 +192,34 @@ function AppShell() {
 }
 
 function Gate() {
-  const { session, profile, loading, signOut } = useAuth();
+  const { session, profile, loading } = useAuth();
 
-  // Se profile não carrega em 4s, limpa sessão e volta pro login.
-  // Isso evita spinner infinito quando JWT expira ou conexão oscila.
-  // O user reloga em 3s e entra direto — muito melhor que ficar preso.
-  useEffect(() => {
-    if (session && !profile && !loading) {
-      const t = setTimeout(async () => {
-        console.warn("[Gate] Profile não carregou em 4s — forçando re-login");
-        await signOut();
-      }, 4000);
-      return () => clearTimeout(t);
-    }
-  }, [session, profile, loading, signOut]);
-
+  // Loading: verificando sessão (< 1s normalmente)
   if (loading) {
     return (
       <div className="min-h-screen bg-[#191919] flex items-center justify-center">
-        <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
+        <div className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
       </div>
     );
   }
 
+  // Sem sessão → login
   if (!session) return <AuthPage />;
 
-  // Profile ainda carregando (máx 4s antes de auto-logout)
+  // Sessão existe + profile do cache → entra imediatamente
+  // Se profile ainda não carregou nem do cache (primeira vez) → spinner curto
   if (!profile) {
     return (
       <div className="min-h-screen bg-[#191919] flex items-center justify-center">
-        <div className="inline-flex h-8 w-8 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
+        <div className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
       </div>
     );
   }
 
+  // Profile existe mas não aprovado
   if (!profile.approved) return <PendingApprovalPage />;
+
+  // Tudo OK → app
   return <AppShell />;
 }
 
