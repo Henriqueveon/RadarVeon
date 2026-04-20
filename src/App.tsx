@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LogOut } from "lucide-react";
@@ -90,13 +90,9 @@ function AppShell() {
   // Escolhe uma quote aleatória no mount (muda a cada refresh)
   const [quote] = useState(() => getRandomQuote());
 
-  const initializedRef = useRef(false);
-
   useEffect(() => {
     if (!profile?.approved) return;
     setCurrentAuthor(profile.id, profile.nome);
-    if (initializedRef.current) return;
-    initializedRef.current = true;
     initializeStore()
       .then(() => setStoreReady(true))
       .catch((err) => {

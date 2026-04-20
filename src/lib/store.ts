@@ -92,6 +92,7 @@ export function getTeam(): TeamMember[] {
   return cache.team;
 }
 
+// Busca todos os profissionais (profiles) com dados completos — usada na aba Profissionais
 export interface ProfissionalCompleto {
   id: string;
   nome: string;
@@ -115,6 +116,7 @@ export async function fetchProfissionais(): Promise<ProfissionalCompleto[]> {
   return (data ?? []) as ProfissionalCompleto[];
 }
 
+// Histórico completo de ações de um profissional — agrega todas as tabelas
 export interface HistoricoAcao {
   id: string;
   tipo:
@@ -128,7 +130,7 @@ export interface HistoricoAcao {
   descricao: string;
   tripulanteId: string | null;
   tripulanteNome: string;
-  data: string;
+  data: string; // ISO date
   detalhes?: string;
 }
 
@@ -345,6 +347,7 @@ function mapEvento(row: any): EventoManual {
 // ---------- Initial load ----------
 let initPromise: Promise<void> | null = null;
 
+// Timeout wrapper — se uma query demorar mais que N ms, retorna vazio
 async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
     p,
@@ -352,11 +355,31 @@ async function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T
   ]);
 }
 
+// Permite reinicializar (ex: após re-login)
+export function resetStore() {
+  initPromise = null;
+  cache.tripulantes = [];
+  cache.campanhas = [];
+  cache.reunioes = [];
+  cache.criativos = [];
+  cache.observacoes = [];
+  cache.eventosManuais = [];
+  cache.team = [];
+  cache.initialized = false;
+  notify();
+}
+
 export async function initializeStore(): Promise<void> {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     try {
-      const TIMEOUT = 8000;
+      // Garante sessão fresca antes de queries (evita RLS retornar vazio)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn("[store] Sem sessão ativa — store ficará vazio");
+      }
+
+      const TIMEOUT = 10000;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const emptyResult = { data: [], error: null } as any;
 
@@ -393,6 +416,7 @@ export async function initializeStore(): Promise<void> {
         ),
       ]);
 
+      // Log erros por tabela (mas continua — melhor parcial que travado)
       // Carrega membros aprovados da equipe (pra dropdown de responsável)
       const teamRes = await withTimeout(
         Promise.resolve(
@@ -429,11 +453,13 @@ export async function initializeStore(): Promise<void> {
       hydrateObservacoes();
     } catch (err) {
       console.error("[store] Erro inesperado em initializeStore:", err);
+      // Mesmo com erro, marca como initialized pra app renderizar
     }
 
     cache.initialized = true;
     notify();
 
+    // Realtime em background — não bloqueia
     try {
       subscribeRealtime();
     } catch (err) {
@@ -458,6 +484,7 @@ function hydrateObservacoes() {
 let realtimeChannel: any = null;
 
 function subscribeRealtime() {
+  // Previne múltiplas subscriptions (remounts)
   if (realtimeChannel) {
     supabase.removeChannel(realtimeChannel);
     realtimeChannel = null;
@@ -605,6 +632,7 @@ export async function updateTripulante(id: string, updates: Partial<TripulanteMo
   if ("status" in updates) dbUpdates.status = updates.status;
   if ("avatar" in updates) dbUpdates.avatar = updates.avatar;
 
+  // Detecta campos alterados pra registrar na timeline
   if (prev) {
     for (const key of Object.keys(dbUpdates)) {
       const oldV = (prev as any)[key === "name" ? "name" : key];
@@ -626,6 +654,7 @@ export async function updateTripulante(id: string, updates: Partial<TripulanteMo
     notify();
   }
 
+  // Registra na Jornada como evento manual tipo observação
   if (changes.length > 0 && currentAuthorId) {
     await addEventoManual({
       tripulanteId: id,
@@ -638,6 +667,7 @@ export async function updateTripulante(id: string, updates: Partial<TripulanteMo
   }
 }
 
+// Remove evento manual da jornada
 export async function deleteEventoManual(id: string) {
   const { error } = await supabase.from("eventos_manuais").delete().eq("id", id);
   if (error) throw error;
@@ -645,10 +675,12 @@ export async function deleteEventoManual(id: string) {
   notify();
 }
 
+// Remove observação (usada quando user quer apagar da jornada)
 export async function deleteObservacao(id: string) {
   const { error } = await supabase.from("observacoes").delete().eq("id", id);
   if (error) throw error;
   cache.observacoes = cache.observacoes.filter((o) => o.id !== id);
+  // Remove também da lista aninhada em tripulantes
   for (const t of cache.tripulantes) {
     t.observacoes = t.observacoes.filter((o) => o.id !== id);
   }

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { resetStore } from "@/lib/store";
 import type { Profile, UserRole } from "@/lib/auth-types";
 import { getInitials } from "@/lib/auth-types";
 
@@ -231,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setUser(null);
     updateProfile(null);
+    resetStore(); // Permite reinicialização na próxima sessão
   }
 
   return (
