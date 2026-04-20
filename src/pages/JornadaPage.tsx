@@ -55,6 +55,7 @@ const EVENT_TYPES = [
   "oficina",
   "venda",
   "alerta_manual",
+  "demanda",
 ] as const;
 
 type EventTipo = (typeof EVENT_TYPES)[number];
@@ -73,6 +74,7 @@ const EVENT_CONFIG: Record<
   alerta: { label: "Alerta", color: "text-[#e07464]", dotBg: "bg-[#e07464]", icon: AlertTriangle },
   marco: { label: "Marco", color: "text-[#d79b3f]", dotBg: "bg-[#d79b3f]", icon: Trophy },
   alerta_manual: { label: "Alerta Manual", color: "text-[#d79b3f]", dotBg: "bg-[#d79b3f]", icon: AlertTriangle },
+  demanda: { label: "Demanda", color: "text-[#529cca]", dotBg: "bg-[#529cca]", icon: Megaphone },
 };
 
 const MANUAL_TIPOS: EventoManual["tipo"][] = [

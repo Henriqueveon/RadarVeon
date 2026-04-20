@@ -38,6 +38,8 @@ export interface KPIData {
   criativos: number;
   campanhasNovas: number;
   otimizacoes: number;
+  demandasCriadas: number;
+  demandasConcluidas: number;
 }
 
 export interface CampanhaRegistro {
@@ -173,6 +175,8 @@ export function getKPIs(tripulanteId?: string): { atual: KPIData; anterior: KPID
         criativos: 2 + (seed % 3),
         campanhasNovas: seed % 3,
         otimizacoes: 2 + (seed % 4),
+        demandasCriadas: 0,
+        demandasConcluidas: 0,
       },
       anterior: {
         reunioes: 1,
@@ -181,12 +185,14 @@ export function getKPIs(tripulanteId?: string): { atual: KPIData; anterior: KPID
         criativos: 1 + (seed % 2),
         campanhasNovas: (seed + 1) % 3,
         otimizacoes: 1 + (seed % 3),
+        demandasCriadas: 0,
+        demandasConcluidas: 0,
       },
     };
   }
   return {
-    atual: { reunioes: 18, vendas: 127500, oficinas: 2, criativos: 24, campanhasNovas: 7, otimizacoes: 31 },
-    anterior: { reunioes: 15, vendas: 98200, oficinas: 2, criativos: 19, campanhasNovas: 5, otimizacoes: 26 },
+    atual: { reunioes: 18, vendas: 127500, oficinas: 2, criativos: 24, campanhasNovas: 7, otimizacoes: 31, demandasCriadas: 0, demandasConcluidas: 0 },
+    anterior: { reunioes: 15, vendas: 98200, oficinas: 2, criativos: 19, campanhasNovas: 5, otimizacoes: 26, demandasCriadas: 0, demandasConcluidas: 0 },
   };
 }
 

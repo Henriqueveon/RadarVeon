@@ -101,8 +101,8 @@ const KPI_CARDS: KPICardConfig[] = [
   { key: "vendas", label: "Vendas declaradas R$", icon: DollarSign, isCurrency: true },
   { key: "oficinas", label: "Oficinas realizadas", icon: GraduationCap, isCurrency: false },
   { key: "criativos", label: "Criativos produzidos", icon: Palette, isCurrency: false },
-  { key: "campanhasNovas", label: "Campanhas novas", icon: Megaphone, isCurrency: false },
-  { key: "otimizacoes", label: "Otimizações executadas", icon: Settings2, isCurrency: false },
+  { key: "demandasCriadas", label: "Demandas criadas", icon: Megaphone, isCurrency: false },
+  { key: "demandasConcluidas", label: "Demandas concluídas", icon: Settings2, isCurrency: false },
 ];
 
 interface DashboardPageProps {

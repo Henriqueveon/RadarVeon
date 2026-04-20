@@ -44,8 +44,22 @@ interface Cache {
   criativos: CriativoMock[];
   observacoes: (Observacao & { tripulanteId: string })[];
   eventosManuais: EventoManual[];
+  demandas: DemandaCache[];
   team: TeamMember[];
   initialized: boolean;
+}
+
+interface DemandaCache {
+  id: string;
+  titulo: string;
+  descricao: string;
+  tripulanteId: string | null;
+  colunaId: string;
+  dataDemanda: string;
+  responsavelNome: string;
+  autorId: string | null;
+  autorNome?: string;
+  createdAt: string;
 }
 
 const cache: Cache = {
@@ -55,6 +69,7 @@ const cache: Cache = {
   criativos: [],
   observacoes: [],
   eventosManuais: [],
+  demandas: [],
   team: [],
   initialized: false,
 };
@@ -365,6 +380,7 @@ export function resetStore() {
   cache.observacoes = [];
   cache.eventosManuais = [];
   cache.team = [];
+  cache.demandas = [];
   cache.initialized = false;
   notify();
 }
@@ -435,6 +451,43 @@ export async function initializeStore(): Promise<void> {
         nome: p.nome,
         role: p.role,
       }));
+
+      // Carrega todas as demandas (últimos 180 dias) pro cache global.
+      // A GestaoCampanhasPage faz fetch próprio pra filtro de data específica.
+      try {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 180);
+        const cutoffIso = cutoff.toISOString().split("T")[0];
+        const demRes = await withTimeout(
+          Promise.resolve(
+            supabase
+              .from("demandas")
+              .select("*, autor:profiles!demandas_autor_id_fkey(nome)")
+              .gte("data_demanda", cutoffIso)
+              .order("created_at", { ascending: false })
+          ),
+          TIMEOUT,
+          emptyResult
+        );
+        if (!demRes.error) {
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          cache.demandas = ((demRes.data ?? []) as any[]).map((row: any) => ({
+            id: row.id,
+            titulo: row.titulo,
+            descricao: row.descricao ?? "",
+            tripulanteId: row.tripulante_id,
+            colunaId: row.coluna_id,
+            dataDemanda: row.data_demanda,
+            responsavelNome: row.responsavel_nome ?? "",
+            autorId: row.autor_id,
+            autorNome: row.autor?.nome ?? "—",
+            createdAt: row.created_at,
+          }));
+          /* eslint-enable */
+        }
+      } catch (err) {
+        console.warn("[store] demandas no cache:", err);
+      }
 
       if (t.error) console.error("[store] tripulantes:", t.error);
       if (c.error) console.error("[store] campanhas:", c.error);
@@ -536,6 +589,35 @@ function subscribeRealtime() {
         role: p.role,
       }));
       notify();
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "demandas" }, async () => {
+      try {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 180);
+        const cutoffIso = cutoff.toISOString().split("T")[0];
+        const { data } = await supabase
+          .from("demandas")
+          .select("*, autor:profiles!demandas_autor_id_fkey(nome)")
+          .gte("data_demanda", cutoffIso)
+          .order("created_at", { ascending: false });
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        cache.demandas = ((data ?? []) as any[]).map((row: any) => ({
+          id: row.id,
+          titulo: row.titulo,
+          descricao: row.descricao ?? "",
+          tripulanteId: row.tripulante_id,
+          colunaId: row.coluna_id,
+          dataDemanda: row.data_demanda,
+          responsavelNome: row.responsavel_nome ?? "",
+          autorId: row.autor_id,
+          autorNome: row.autor?.nome ?? "—",
+          createdAt: row.created_at,
+        }));
+        /* eslint-enable */
+        notify();
+      } catch {
+        // silent
+      }
     })
     .subscribe();
 }
@@ -976,6 +1058,19 @@ export function computeKPIs(tripulanteId?: string, startDate?: string, endDate?:
   const currOficinas = Math.ceil(currReunioes.length / 4) || 0;
   const prevOficinas = Math.ceil(prevReunioes.length / 4) || 0;
 
+  // Demandas (Gestão de Campanhas)
+  function filterDemandas(arr: typeof cache.demandas, from: Date, to: Date) {
+    return arr.filter((item) => {
+      const matchTrip = !tripulanteId || item.tripulanteId === tripulanteId;
+      const matchDate = inRange(item.dataDemanda, from, to);
+      return matchTrip && matchDate;
+    });
+  }
+  const currDemandas = filterDemandas(cache.demandas, start, end);
+  const prevDemandas = filterDemandas(cache.demandas, prevStart, prevEnd);
+  const currDemandasConcluidas = currDemandas.filter((d) => d.colunaId === "concluido").length;
+  const prevDemandasConcluidas = prevDemandas.filter((d) => d.colunaId === "concluido").length;
+
   return {
     atual: {
       reunioes: currReunioes.length,
@@ -984,6 +1079,8 @@ export function computeKPIs(tripulanteId?: string, startDate?: string, endDate?:
       criativos: currCriativos.length,
       campanhasNovas: currCampNovas.length,
       otimizacoes: currOtimizacoes.length,
+      demandasCriadas: currDemandas.length,
+      demandasConcluidas: currDemandasConcluidas,
     },
     anterior: {
       reunioes: prevReunioes.length,
@@ -992,6 +1089,8 @@ export function computeKPIs(tripulanteId?: string, startDate?: string, endDate?:
       criativos: prevCriativos.length,
       campanhasNovas: prevCampNovas.length,
       otimizacoes: prevOtimizacoes.length,
+      demandasCriadas: prevDemandas.length,
+      demandasConcluidas: prevDemandasConcluidas,
     },
   };
 }
@@ -999,7 +1098,7 @@ export function computeKPIs(tripulanteId?: string, startDate?: string, endDate?:
 export interface TimelineEvent {
   id: string;
   tripulanteId: string;
-  tipo: "onboarding" | "reuniao" | "campanha" | "criativo" | "venda" | "oficina" | "observacao" | "alerta" | "marco" | "alerta_manual";
+  tipo: "onboarding" | "reuniao" | "campanha" | "criativo" | "venda" | "oficina" | "observacao" | "alerta" | "marco" | "alerta_manual" | "demanda";
   titulo: string;
   descricao: string;
   data: string;
@@ -1095,6 +1194,21 @@ export function getTimelineForTripulante(tripulanteId: string): TimelineEvent[] 
       data: ev.data,
       responsavel: ev.responsavel,
       fonte: "manual",
+    });
+  }
+
+  // Demandas (Gestão de Campanhas) vinculadas ao tripulante
+  for (const d of cache.demandas.filter((dd) => dd.tripulanteId === tripulanteId)) {
+    events.push({
+      id: `demanda-${d.id}`,
+      tripulanteId,
+      tipo: "demanda",
+      titulo: d.titulo,
+      descricao: d.descricao,
+      data: d.dataDemanda,
+      responsavel: d.responsavelNome || d.autorNome || "—",
+      fonte: "automatico",
+      metadata: { colunaId: d.colunaId, autorNome: d.autorNome },
     });
   }
 
