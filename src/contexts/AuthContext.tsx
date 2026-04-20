@@ -70,17 +70,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchProfile(userId: string): Promise<Profile | null> {
     try {
+      // Timeout de 6s — se a query demora mais, retorna null e deixa UI prosseguir
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .maybeSingle() as any);
-      if (error) {
-        console.error("[Auth] fetchProfile erro:", error);
+      const query = supabase.from("profiles").select("*").eq("id", userId).maybeSingle() as any;
+      const timeout = new Promise<{ data: null; error: null }>((resolve) =>
+        setTimeout(() => {
+          console.warn("[Auth] fetchProfile TIMEOUT 6s — usando null");
+          resolve({ data: null, error: null });
+        }, 6000)
+      );
+      const result = await Promise.race([query, timeout]);
+      if (result.error) {
+        console.error("[Auth] fetchProfile erro:", result.error);
         return null;
       }
-      return data as Profile | null;
+      return result.data as Profile | null;
     } catch (err) {
       console.error("[Auth] fetchProfile exception:", err);
       return null;

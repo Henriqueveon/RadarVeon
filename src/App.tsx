@@ -188,9 +188,18 @@ function AppShell() {
 }
 
 function Gate() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, signOut } = useAuth();
+  const [showRescue, setShowRescue] = useState(false);
 
-  // Loading: verificando sessão (< 1s normalmente)
+  // Se session existe mas profile não carrega em 8s, mostra botões de escape
+  useEffect(() => {
+    if (session && !profile && !loading) {
+      const t = setTimeout(() => setShowRescue(true), 8000);
+      return () => clearTimeout(t);
+    }
+    setShowRescue(false);
+  }, [session, profile, loading]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#191919] flex items-center justify-center">
@@ -199,23 +208,41 @@ function Gate() {
     );
   }
 
-  // Sem sessão → login
   if (!session) return <AuthPage />;
 
-  // Sessão existe + profile do cache → entra imediatamente
-  // Se profile ainda não carregou nem do cache (primeira vez) → spinner curto
   if (!profile) {
     return (
-      <div className="min-h-screen bg-[#191919] flex items-center justify-center">
-        <div className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
+      <div className="min-h-screen bg-[#191919] flex items-center justify-center p-6">
+        <div className="text-center space-y-4">
+          <div className="inline-flex h-6 w-6 animate-spin rounded-full border-2 border-[#529cca] border-t-transparent" />
+          <p className="text-[12px] text-[#6f6f6f]">Carregando perfil...</p>
+          {showRescue && (
+            <div className="pt-4 space-y-3">
+              <p className="text-[12px] text-[#d79b3f]">Está demorando mais que o normal.</p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="rounded border border-white/10 hover:bg-white/5 text-white text-[13px] px-3 py-1.5"
+                >
+                  Recarregar
+                </button>
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="rounded border border-white/10 hover:bg-white/5 text-[#9b9b9b] hover:text-white text-[13px] px-3 py-1.5"
+                >
+                  Sair
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
-  // Profile existe mas não aprovado
   if (!profile.approved) return <PendingApprovalPage />;
-
-  // Tudo OK → app
   return <AppShell />;
 }
 

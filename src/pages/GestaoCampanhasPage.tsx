@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus,
   X,
@@ -204,14 +204,22 @@ export default function GestaoCampanhasPage() {
   }, [dataInicio, dataFim]);
 
   /* ------------------- Realtime ------------------- */
+  // Usa ref pra manter data atual sem re-criar channel a cada mudança
+  const dataRangeRef = useRef({ dataInicio, dataFim });
   useEffect(() => {
+    dataRangeRef.current = { dataInicio, dataFim };
+  }, [dataInicio, dataFim]);
+
+  useEffect(() => {
+    // Channel criado uma única vez, com nome único por componente
     const channel = supabase
-      .channel("demandas-kanban")
+      .channel(`demandas-kanban-${Math.random().toString(36).slice(2, 8)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "demandas" },
         () => {
-          fetchDemandas(dataInicio, dataFim).then(setDemandas).catch(() => {});
+          const { dataInicio: ini, dataFim: fim } = dataRangeRef.current;
+          fetchDemandas(ini, fim).then(setDemandas).catch(() => {});
         }
       )
       .on(
@@ -225,7 +233,7 @@ export default function GestaoCampanhasPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [dataInicio, dataFim]);
+  }, []);
 
   /* ------------------- Filters ------------------- */
   const filteredDemandas = useMemo(() => {
